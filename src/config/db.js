@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const mysql = require('mysql2/promise');
 // dotenv is preloaded via -r dotenv/config in npm scripts; fallback here for direct node execution
 try {
   // eslint-disable-next-line global-require
@@ -8,6 +9,7 @@ try {
 }
 
 let pool;
+let mysqlPool;
 
 function getPgPool() {
   if (!pool) {
@@ -33,4 +35,28 @@ function getPgPool() {
   return pool;
 }
 
-module.exports = { getPgPool };
+async function getMysqlPool() {
+  if (!mysqlPool) {
+    const {
+      MYSQL_HOST,
+      MYSQL_PORT,
+      MYSQL_DATABASE,
+      MYSQL_USER,
+      MYSQL_PASSWORD
+    } = process.env;
+
+    mysqlPool = mysql.createPool({
+      host: MYSQL_HOST || 'localhost',
+      port: MYSQL_PORT ? Number(MYSQL_PORT) : 3306,
+      database: MYSQL_DATABASE || 'oripro',
+      user: MYSQL_USER || 'root',
+      password: typeof MYSQL_PASSWORD === 'string' ? MYSQL_PASSWORD : undefined,
+      waitForConnections: true,
+      connectionLimit: 10,
+      namedPlaceholders: true
+    });
+  }
+  return mysqlPool;
+}
+
+module.exports = { getPgPool, getMysqlPool };

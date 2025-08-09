@@ -1,9 +1,16 @@
 const { Router } = require('express');
 const { body, validationResult } = require('express-validator');
 const { PostgresUserRepository } = require('../repositories/PostgresUserRepository');
+const { MySqlUserRepository } = require('../repositories/MySqlUserRepository');
 const { LoginUseCase } = require('../usecases/LoginUseCase');
 
-const userRepository = new PostgresUserRepository();
+function buildUserRepository() {
+  const dbType = (process.env.DB_TYPE || 'postgres').toLowerCase();
+  if (dbType === 'mysql') return new MySqlUserRepository();
+  return new PostgresUserRepository();
+}
+
+const userRepository = buildUserRepository();
 const loginUseCase = new LoginUseCase({
   userRepository,
   jwtSecret: process.env.JWT_SECRET,
