@@ -8,14 +8,17 @@ class LoginUseCase {
     this.tokenTtl = tokenTtl;
   }
 
-  async execute({ email, password }) {
-    const user = await this.userRepository.findByEmail(email);
+  async execute({ email, password }, ctx = {}) {
+    ctx.log?.info({ email }, 'login_attempt');
+    const user = await this.userRepository.findByEmail(email, ctx);
     if (!user) {
+      ctx.log?.warn({ email }, 'login_invalid_email');
       return { ok: false, status: 401, error: 'Invalid credentials' };
     }
 
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) {
+      ctx.log?.warn({ userId: user.id }, 'login_invalid_password');
       return { ok: false, status: 401, error: 'Invalid credentials' };
     }
 
@@ -33,7 +36,7 @@ class LoginUseCase {
       { expiresIn: this.tokenTtl }
     );
 
-    return {
+    const result = {
       ok: true,
       status: 200,
       data: {
@@ -41,6 +44,8 @@ class LoginUseCase {
         user: user.toJSON()
       }
     };
+    ctx.log?.info({ userId: user.id }, 'login_success');
+    return result;
   }
 }
 

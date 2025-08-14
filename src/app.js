@@ -7,14 +7,33 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const authRouter = require('./routes/auth');
+const assetsRouter = require('./routes/assets');
+const { requestContext } = require('./middleware/requestContext');
+const { metricsMiddleware, metricsHandler } = require('./services/metrics');
 
 const app = express();
 
 // Middleware
 app.use(helmet());
 app.use(cors());
+app.use(requestContext);
+app.use(metricsMiddleware);
 app.use(express.json());
-app.use(morgan('dev'));
+app.use(
+  morgan((tokens, req, res) => {
+    const rid = req.requestId || '-';
+    return JSON.stringify({
+      ts: new Date().toISOString(),
+      level: 'http',
+      requestId: rid,
+      method: tokens.method(req, res),
+      url: tokens.url(req, res),
+      status: Number(tokens.status(req, res)),
+      length: tokens.res(req, res, 'content-length'),
+      responseMs: Number(tokens['response-time'](req, res))
+    });
+  })
+);
 
 // Health check
 app.get('/health', (_req, res) => {
@@ -23,6 +42,8 @@ app.get('/health', (_req, res) => {
 
 // Routes
 app.use('/api/auth', authRouter);
+app.use('/api/assets', assetsRouter);
+app.get('/metrics', metricsHandler);
 
 // 404 handler
 app.use((req, res) => {
