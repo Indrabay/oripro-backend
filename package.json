@@ -8,7 +8,10 @@
     "start": "node --env_file=./.env -r dotenv/config src/app.js",
     "dev": "nodemon --env_file=./.env --watch src -r dotenv/config src/app.js",
     "migrate": "node --env_file=./.env -r dotenv/config scripts/runMigrations.js",
-    "seed": "node --env_file=./.env -r dotenv/config scripts/seedDemoUser.js"
+    "seed": "node --env_file=./.env -r dotenv/config scripts/seedDemoUser.js",
+    "seed:roles": "node --env_file=./.env -r dotenv/config scripts/seedRoles.js",
+    "seed:admin": "node --env_file=./.env -r dotenv/config scripts/seedAdminUser.js",
+    "seed:all": "node --env_file=./.env -r dotenv/config scripts/seedAll.js"
   },
   "engines": {
     "node": ">=18"

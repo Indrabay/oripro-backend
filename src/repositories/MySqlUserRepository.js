@@ -51,6 +51,64 @@ class MySqlUserRepository {
     );
     return this.findById(userId);
   }
+
+  async listAll(ctx = {}) {
+    ctx.log?.info({}, 'repo_list_all_users');
+    const pool = await this.poolPromise;
+    const [rows] = await pool.query(
+      `SELECT id, email, password, name, role_id, created_at, updated_at, created_by, updated_by
+       FROM users ORDER BY created_at DESC`
+    );
+    return rows.map(row => User.fromRow(row));
+  }
+
+  async update(id, userData, ctx = {}) {
+    ctx.log?.info({ id }, 'repo_update_user');
+    const { email, name, roleId } = userData;
+    const pool = await this.poolPromise;
+    
+    const updateFields = [];
+    const values = [];
+
+    if (email !== undefined) {
+      updateFields.push('email = ?');
+      values.push(email);
+    }
+    if (name !== undefined) {
+      updateFields.push('name = ?');
+      values.push(name);
+    }
+    if (roleId !== undefined) {
+      updateFields.push('role_id = ?');
+      values.push(roleId);
+    }
+
+    if (updateFields.length === 0) {
+      return this.findById(id, ctx);
+    }
+
+    updateFields.push('updated_at = NOW()');
+    updateFields.push('updated_by = ?');
+    values.push(userData.updatedBy);
+
+    values.push(id);
+
+    await pool.query(
+      `UPDATE users SET ${updateFields.join(', ')} WHERE id = ?`,
+      values
+    );
+    return this.findById(id, ctx);
+  }
+
+  async delete(id, ctx = {}) {
+    ctx.log?.info({ id }, 'repo_delete_user');
+    const pool = await this.poolPromise;
+    const [result] = await pool.query(
+      'DELETE FROM users WHERE id = ?',
+      [id]
+    );
+    return result.affectedRows > 0;
+  }
 }
 
 module.exports = { MySqlUserRepository };

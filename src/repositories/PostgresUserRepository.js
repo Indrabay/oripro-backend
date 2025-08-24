@@ -48,6 +48,63 @@ class PostgresUserRepository {
     );
     return rows[0] ? User.fromRow(rows[0]) : null;
   }
+
+  async listAll(ctx = {}) {
+    ctx.log?.info({}, 'repo_list_all_users');
+    const { rows } = await this.pool.query(
+      `SELECT id, email, password, name, role_id, created_at, updated_at, created_by, updated_by
+       FROM users ORDER BY created_at DESC`
+    );
+    return rows.map(row => User.fromRow(row));
+  }
+
+  async update(id, userData, ctx = {}) {
+    ctx.log?.info({ id }, 'repo_update_user');
+    const { email, name, roleId } = userData;
+    
+    const updateFields = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (email !== undefined) {
+      updateFields.push(`email = $${paramCount++}`);
+      values.push(email);
+    }
+    if (name !== undefined) {
+      updateFields.push(`name = $${paramCount++}`);
+      values.push(name);
+    }
+    if (roleId !== undefined) {
+      updateFields.push(`role_id = $${paramCount++}`);
+      values.push(roleId);
+    }
+
+    if (updateFields.length === 0) {
+      return this.findById(id, ctx);
+    }
+
+    updateFields.push(`updated_at = NOW()`);
+    updateFields.push(`updated_by = $${paramCount++}`);
+    values.push(userData.updatedBy);
+
+    values.push(id);
+
+    const { rows } = await this.pool.query(
+      `UPDATE users SET ${updateFields.join(', ')} WHERE id = $${paramCount}
+       RETURNING id, email, password, name, role_id, created_at, updated_at, created_by, updated_by`,
+      values
+    );
+    return rows[0] ? User.fromRow(rows[0]) : null;
+  }
+
+  async delete(id, ctx = {}) {
+    ctx.log?.info({ id }, 'repo_delete_user');
+    const { rowCount } = await this.pool.query(
+      'DELETE FROM users WHERE id = $1',
+      [id]
+    );
+    return rowCount > 0;
+  }
 }
 
 module.exports = { PostgresUserRepository };

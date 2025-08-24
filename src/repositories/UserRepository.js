@@ -17,6 +17,21 @@ class UserRepository {
   async create(_user) {
     throw new Error('Not implemented');
   }
+
+  // eslint-disable-next-line class-methods-use-this
+  async listAll(_ctx) {
+    throw new Error('Not implemented');
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  async update(_id, _userData, _ctx) {
+    throw new Error('Not implemented');
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  async delete(_id, _ctx) {
+    throw new Error('Not implemented');
+  }
 }
 
 module.exports = { UserRepository };

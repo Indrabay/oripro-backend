@@ -8,6 +8,7 @@ dotenv.config();
 
 const authRouter = require('./routes/auth');
 const assetsRouter = require('./routes/assets');
+const usersRouter = require('./routes/users');
 const { requestContext } = require('./middleware/requestContext');
 const { metricsMiddleware, metricsHandler } = require('./services/metrics');
 
@@ -43,6 +44,7 @@ app.get('/health', (_req, res) => {
 // Routes
 app.use('/api/auth', authRouter);
 app.use('/api/assets', assetsRouter);
+app.use('/api/users', usersRouter);
 app.get('/metrics', metricsHandler);
 
 // 404 handler
