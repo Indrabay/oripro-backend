@@ -6,13 +6,38 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-const authRouter = require('./routes/auth');
-const assetsRouter = require('./routes/assets');
-const usersRouter = require('./routes/users');
+const auth = require('./routes/auth');
+const asset = require('./routes/assets');
+const user = require('./routes/users');
 const { requestContext } = require('./middleware/requestContext');
 const { metricsMiddleware, metricsHandler } = require('./services/metrics');
 
 const app = express();
+const { UserRepository } = require('./repositories/UserRepository');
+const { PasswordResetTokenRepository } = require('./repositories/PasswordResetTokenRepository');
+const { AssetRepository } = require('./repositories/AssetRepository');
+
+const authUc = require('./usecases/AuthUsecase');
+const assetUc = require('./usecases/AssetUsecase');
+const userUc = require('./usecases/UserUsecase');
+
+const userRepository = new UserRepository();
+const tokenRepository = new PasswordResetTokenRepository();
+const assertRepository = new AssetRepository();
+
+const assetUsecase = new assetUc(assertRepository);
+const authUsecase = new authUc(
+  userRepository,
+  process.env.JWT_SECRET,
+  process.env.TOKEN_TTL || '1h',
+  process.env.APP_BASE_URL || 'http://localhost:3000',
+  tokenRepository
+);
+const userUsecase = new userUc(userRepository);
+
+const authRouter = auth.InitAuthRouter(authUsecase);
+const assetRouter = asset.InitAssetRouter(assetUsecase);
+const userRouter = user.InitUserRouter(userUsecase);
 
 // Middleware
 app.use(helmet());
@@ -30,6 +55,7 @@ app.use(
       method: tokens.method(req, res),
       url: tokens.url(req, res),
       status: Number(tokens.status(req, res)),
+      request: req.body,
       length: tokens.res(req, res, 'content-length'),
       responseMs: Number(tokens['response-time'](req, res))
     });
@@ -43,12 +69,12 @@ app.get('/health', (_req, res) => {
 
 // Routes
 app.use('/api/auth', authRouter);
-app.use('/api/assets', assetsRouter);
-app.use('/api/users', usersRouter);
+app.use('/api/assets', assetRouter);
+app.use('/api/users', userRouter);
 app.get('/metrics', metricsHandler);
 
 // 404 handler
-app.use((req, res) => {
+app.use((_req, res) => {
   res.status(404).json({ message: 'Not Found' });
 });
 
