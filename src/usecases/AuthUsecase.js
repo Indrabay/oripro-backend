@@ -5,12 +5,13 @@ const { sendPasswordResetEmail } = require('../services/Mailer');
 const { UserRepository } = require('../repositories/UserRepository');
 
 class AuthUsecase {
-  constructor(userRepository, jwtSecret, tokenTtl = '1h', appBaseUrl, tokenRepository) {
+  constructor(userRepository, jwtSecret, tokenTtl = '1h', appBaseUrl, tokenRepository, roleRepository) {
     this.userRepository = userRepository;
     this.jwtSecret = jwtSecret;
     this.tokenTtl = tokenTtl;
     this.appBaseUrl = appBaseUrl;
     this.tokenRepository = tokenRepository;
+    this.roleRepository = roleRepository;
   }
 
   async login({ email, password }, ctx) {
@@ -31,11 +32,14 @@ class AuthUsecase {
       return { ok: false, status: 500, error: 'Server misconfiguration: missing JWT_SECRET' };
     }
 
+    const role = await this.roleRepository.findById(user.role_id, ctx);
+
     const token = jwt.sign(
       {
         sub: user.id,
         email: user.email,
-        roleId: user.role_id
+        roleId: user.role_id,
+        roleName: role.name
       },
       this.jwtSecret,
       { expiresIn: this.tokenTtl }
