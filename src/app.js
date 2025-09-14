@@ -10,6 +10,7 @@ const auth = require('./routes/auth');
 const asset = require('./routes/assets');
 const user = require('./routes/users');
 const tenant = require('./routes/tenants');
+const unit = require('./routes/units');
 const { requestContext } = require('./middleware/requestContext');
 const { metricsMiddleware, metricsHandler } = require('./services/metrics');
 
@@ -18,18 +19,23 @@ const { UserRepository } = require('./repositories/UserRepository');
 const { PasswordResetTokenRepository } = require('./repositories/PasswordResetTokenRepository');
 const { AssetRepository } = require('./repositories/AssetRepository');
 const TenantRepository = require('./repositories/TenantRepository');
+const UnitRepository = require('./repositories/Unit');
 
 const authUc = require('./usecases/AuthUsecase');
 const assetUc = require('./usecases/AssetUsecase');
 const userUc = require('./usecases/UserUsecase');
 const tenantUc = require('./usecases/TenantUsecase');
 
+const tenantRepository = new TenantRepository();
+const unitUc = require('./usecases/UnitUsecase');
+
+
 const userRepository = new UserRepository();
 const tokenRepository = new PasswordResetTokenRepository();
-const assertRepository = new AssetRepository();
-const tenantRepository = new TenantRepository();
+const assetRepository = new AssetRepository();
+const unitRepository = new UnitRepository();
 
-const assetUsecase = new assetUc(assertRepository);
+const assetUsecase = new assetUc(assetRepository);
 const authUsecase = new authUc(
   userRepository,
   process.env.JWT_SECRET,
@@ -39,11 +45,13 @@ const authUsecase = new authUc(
 );
 const userUsecase = new userUc(userRepository);
 const tenantUsecase = new tenantUc(tenantRepository);
+const unitUsecase = new unitUc(unitRepository);
 
 const authRouter = auth.InitAuthRouter(authUsecase);
 const assetRouter = asset.InitAssetRouter(assetUsecase);
 const userRouter = user.InitUserRouter(userUsecase);
 const tenantRouter = tenant.InitTenantRouter(tenantUsecase);
+const unitRouter = unit.InitUnitRouter(unitUsecase);
 
 // Middleware
 app.use(helmet());
@@ -78,6 +86,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/assets', assetRouter);
 app.use('/api/users', userRouter);
 app.use('/api/tenants', tenantRouter);
+app.use('/api/units', unitRouter);
 app.get('/metrics', metricsHandler);
 
 // 404 handler
