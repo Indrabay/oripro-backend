@@ -9,6 +9,7 @@ dotenv.config();
 const auth = require('./routes/auth');
 const asset = require('./routes/assets');
 const user = require('./routes/users');
+const tenant = require('./routes/tenants');
 const unit = require('./routes/units');
 const { requestContext } = require('./middleware/requestContext');
 const { metricsMiddleware, metricsHandler } = require('./services/metrics');
@@ -17,11 +18,15 @@ const app = express();
 const { UserRepository } = require('./repositories/UserRepository');
 const { PasswordResetTokenRepository } = require('./repositories/PasswordResetTokenRepository');
 const { AssetRepository } = require('./repositories/AssetRepository');
+const TenantRepository = require('./repositories/TenantRepository');
 const UnitRepository = require('./repositories/Unit');
 
 const authUc = require('./usecases/AuthUsecase');
 const assetUc = require('./usecases/AssetUsecase');
 const userUc = require('./usecases/UserUsecase');
+const tenantUc = require('./usecases/TenantUsecase');
+
+const tenantRepository = new TenantRepository();
 const unitUc = require('./usecases/UnitUsecase');
 
 
@@ -39,11 +44,13 @@ const authUsecase = new authUc(
   tokenRepository
 );
 const userUsecase = new userUc(userRepository);
+const tenantUsecase = new tenantUc(tenantRepository);
 const unitUsecase = new unitUc(unitRepository);
 
 const authRouter = auth.InitAuthRouter(authUsecase);
 const assetRouter = asset.InitAssetRouter(assetUsecase);
 const userRouter = user.InitUserRouter(userUsecase);
+const tenantRouter = tenant.InitTenantRouter(tenantUsecase);
 const unitRouter = unit.InitUnitRouter(unitUsecase);
 
 // Middleware
@@ -78,6 +85,7 @@ app.get('/health', (_req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/assets', assetRouter);
 app.use('/api/users', userRouter);
+app.use('/api/tenants', tenantRouter);
 app.use('/api/units', unitRouter);
 app.get('/metrics', metricsHandler);
 
