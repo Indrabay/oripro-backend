@@ -1,13 +1,11 @@
-class UnitUseCases {
+class UnitUsecase {
   constructor(unitRepository) {
     this.unitRepository = unitRepository;
   }
 
-  async createUnit(data) {
+  async createUnit(data, ctx) {
+    ctx.log?.info({ data }, 'usecase_create_unit');
     // Business logic for creating a unit
-    if (!data.name || !data.symbol) {
-      throw new Error('Name and symbol are required');
-    }
     return this.unitRepository.create(data);
   }
 
@@ -44,4 +42,4 @@ class UnitUseCases {
   }
 }
 
-module.exports = UnitUseCases;
+module.exports = UnitUsecase;

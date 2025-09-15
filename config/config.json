@@ -1,0 +1,16 @@
+{
+  "postgres": {
+    "username": "changeme",
+    "password": "changeme",
+    "database": "changeme",
+    "host": "changeme",
+    "dialect": "changeme"
+  },
+  "mysql": {
+    "username": "changeme",
+    "password": "changeme",
+    "database": "changeme",
+    "host": "changeme",
+    "dialect": "changeme"
+  }
+}

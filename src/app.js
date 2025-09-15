@@ -9,26 +9,40 @@ dotenv.config();
 const auth = require('./routes/auth');
 const asset = require('./routes/assets');
 const user = require('./routes/users');
-const unit = require('./routes/units');
+const units = require('./routes/units');
+const tenant = require('./routes/tenants');
 const { requestContext } = require('./middleware/requestContext');
 const { metricsMiddleware, metricsHandler } = require('./services/metrics');
 
 const app = express();
-const { UserRepository } = require('./repositories/UserRepository');
-const { PasswordResetTokenRepository } = require('./repositories/PasswordResetTokenRepository');
-const { AssetRepository } = require('./repositories/AssetRepository');
+const UserRepository = require('./repositories/User');
+const PasswordResetTokenRepository = require('./repositories/PasswordResetToken');
+const AssetRepository = require('./repositories/Asset');
 const UnitRepository = require('./repositories/Unit');
+const RoleRepository = require('./repositories/Role');
+const TenantRepository = require('./repositories/Tenant');
 
-const authUc = require('./usecases/AuthUsecase');
-const assetUc = require('./usecases/AssetUsecase');
-const userUc = require('./usecases/UserUsecase');
-const unitUc = require('./usecases/UnitUsecase');
+const authUc = require('./usecases/Auth');
+const assetUc = require('./usecases/Asset');
+const userUc = require('./usecases/User');
+const unitUc = require('./usecases/Unit');
+const tenantUc = require('./usecases/Tenant');
+
+const modelUser = require('./models/User');
+const modelRole = require('./models/Role');
+const {Asset} = require('./models/Asset');
+const modelUnit = require('./models/Unit');
+const modelAdminAsset = require('./models/AssetAdmin');
+const modelPasswordResetToken = require('./models/PasswordResetToken');
+const modelTenant = require('./models/Tenant');
 
 
-const userRepository = new UserRepository();
-const tokenRepository = new PasswordResetTokenRepository();
-const assetRepository = new AssetRepository();
-const unitRepository = new UnitRepository();
+const userRepository = new UserRepository(modelUser);
+const tokenRepository = new PasswordResetTokenRepository(modelPasswordResetToken);
+const assetRepository = new AssetRepository(Asset, modelAdminAsset);
+const unitRepository = new UnitRepository(modelUnit);
+const roleRepository = new RoleRepository(modelRole);
+const tenantRepository = new TenantRepository(modelTenant);
 
 const assetUsecase = new assetUc(assetRepository);
 const authUsecase = new authUc(
@@ -36,15 +50,18 @@ const authUsecase = new authUc(
   process.env.JWT_SECRET,
   process.env.TOKEN_TTL || '1h',
   process.env.APP_BASE_URL || 'http://localhost:3000',
-  tokenRepository
+  tokenRepository,
+  roleRepository
 );
 const userUsecase = new userUc(userRepository);
 const unitUsecase = new unitUc(unitRepository);
+const tenantUsecase = new tenantUc(tenantRepository);
 
 const authRouter = auth.InitAuthRouter(authUsecase);
 const assetRouter = asset.InitAssetRouter(assetUsecase);
 const userRouter = user.InitUserRouter(userUsecase);
-const unitRouter = unit.InitUnitRouter(unitUsecase);
+const unitRouter = units.InitUnitRouter(unitUsecase);
+const tenantRouter = tenant.InitTenantRouter(tenantUsecase);
 
 // Middleware
 app.use(helmet());
@@ -79,6 +96,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/assets', assetRouter);
 app.use('/api/users', userRouter);
 app.use('/api/units', unitRouter);
+app.use('/api/tenants', tenantRouter);
 app.get('/metrics', metricsHandler);
 
 // 404 handler
