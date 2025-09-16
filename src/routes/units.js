@@ -19,24 +19,20 @@ function InitUnitRouter(UnitUsecase) {
       body('name').isString().notEmpty(),
       body('asset_id').isUUID().notEmpty(),
       body('code').isString().notEmpty(),
-      body('floor').isInt().notEmpty(),
+      body('description').optional().isString(),
       body('area').isFloat().notEmpty(),
-      body('status').optional().isInt(),
-      body('description').optional().isString()
     ],
     async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-      const { name, asset_id, code, floor, area, status, description } = req.body;
+      const { name, asset_id, code, description, area } = req.body;
       req.log?.info({ name }, 'route_units_create');
       const unit = await UnitUsecase.createUnit({
         name,
         asset_id,
         code,
-        floor,
-        area,
-        status: status ? status : 1,
         description,
+        area,
         createdBy: req.auth.userId
       }, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName });
       return res.status(201).json(unit);
@@ -57,7 +53,7 @@ function InitUnitRouter(UnitUsecase) {
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
       req.log?.info({ id: req.params.id }, 'route_units_get');
       try {
-        const unit = await UnitUsecase.getUnit(req.params.id, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName });
+        const unit = await UnitUsecase.getUnitById(req.params.id, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName });
         if (!unit) return res.status(404).json({ message: 'Unit not found' });
         return res.json(unit);
       } catch (error) {
@@ -72,26 +68,18 @@ function InitUnitRouter(UnitUsecase) {
     [
       param('id').isString().notEmpty(),
       body('name').optional().isString().notEmpty(),
-      body('asset_id').optional().isUUID().notEmpty(),
-      body('code').optional().isString().notEmpty(),
-      body('floor').optional().isInt().notEmpty(),
       body('area').optional().isFloat().notEmpty(),
-      body('status').optional().isInt(),
       body('description').optional().isString()
     ],
     async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-      const { name, asset_id, code, floor, area, status, description } = req.body;
+      const { name, area, description } = req.body;
       req.log?.info({ id: req.params.id }, 'route_units_update');
       try {
         const unit = await UnitUsecase.updateUnit(req.params.id, {
           name,
-          asset_id,
-          code,
-          floor,
           area,
-          status,
           description,
           updatedBy: req.auth.userId
         }, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName });
@@ -125,4 +113,4 @@ function InitUnitRouter(UnitUsecase) {
   return router;
 }
 
-module.exports = InitUnitRouter;
+module.exports = {InitUnitRouter};

@@ -2,7 +2,6 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { sendPasswordResetEmail } = require('../services/Mailer');
-const { UserRepository } = require('../repositories/UserRepository');
 
 class AuthUsecase {
   constructor(userRepository, jwtSecret, tokenTtl = '1h', appBaseUrl, tokenRepository, roleRepository) {
