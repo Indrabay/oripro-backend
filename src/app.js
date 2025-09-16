@@ -11,6 +11,7 @@ const asset = require('./routes/assets');
 const user = require('./routes/users');
 const units = require('./routes/units');
 const tenant = require('./routes/tenants');
+const { InitRoleRouter } = require('./routes/roles');
 const { requestContext } = require('./middleware/requestContext');
 const { metricsMiddleware, metricsHandler } = require('./services/metrics');
 
@@ -27,6 +28,7 @@ const assetUc = require('./usecases/Asset');
 const userUc = require('./usecases/User');
 const unitUc = require('./usecases/Unit');
 const tenantUc = require('./usecases/Tenant');
+const roleUc = require('./usecases/Role');
 
 const modelUser = require('./models/User');
 const modelRole = require('./models/Role');
@@ -56,16 +58,23 @@ const authUsecase = new authUc(
 const userUsecase = new userUc(userRepository);
 const unitUsecase = new unitUc(unitRepository);
 const tenantUsecase = new tenantUc(tenantRepository);
+const roleUsecase = new roleUc(roleRepository);
 
 const authRouter = auth.InitAuthRouter(authUsecase);
 const assetRouter = asset.InitAssetRouter(assetUsecase);
 const userRouter = user.InitUserRouter(userUsecase);
 const unitRouter = units.InitUnitRouter(unitUsecase);
 const tenantRouter = tenant.InitTenantRouter(tenantUsecase);
+const roleRouter = InitRoleRouter(roleUsecase);
 
 // Middleware
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://localhost:3001'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(requestContext);
 app.use(metricsMiddleware);
 app.use(express.json());
@@ -97,6 +106,7 @@ app.use('/api/assets', assetRouter);
 app.use('/api/users', userRouter);
 app.use('/api/units', unitRouter);
 app.use('/api/tenants', tenantRouter);
+app.use('/api/roles', roleRouter);
 app.get('/metrics', metricsHandler);
 
 // 404 handler
