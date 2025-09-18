@@ -18,23 +18,33 @@ function InitUnitRouter(UnitUsecase) {
     [
       body('name').isString().notEmpty(),
       body('asset_id').isUUID().notEmpty(),
-      body('code').isString().notEmpty(),
       body('description').optional().isString(),
-      body('area').isFloat().notEmpty(),
+      body('size').isFloat().notEmpty(),
+      body('lamp').optional().isNumeric(),
+      body('rent_price').notEmpty().isFloat(),
+      body('electrical_socket').optional().isNumeric(),
+      body('electrical_power').notEmpty().isNumeric(),
+      body('electrical_unit').optional().isString(),
+      body('is_toilet_exist').notEmpty().isBoolean()
     ],
     async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-      const { name, asset_id, code, description, area } = req.body;
+      const { name, asset_id, size, rent_price, lamp, electrical_socket, electrical_power, electrical_unit, is_toilet_exist, description } = req.body;
       req.log?.info({ name }, 'route_units_create');
       const unit = await UnitUsecase.createUnit({
         name,
         asset_id,
-        code,
         description,
-        area,
+        lamp,
+        rent_price,
+        electrical_socket,
+        electrical_power,
+        electrical_unit,
+        is_toilet_exist,
+        size,
         createdBy: req.auth.userId
-      }, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName });
+      }, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName, userId: req.auth.userId });
       return res.status(201).json(unit);
     }
   );

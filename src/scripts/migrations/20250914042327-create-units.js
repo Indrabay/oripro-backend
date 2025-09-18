@@ -19,18 +19,38 @@ module.exports = {
           type: Sequelize.STRING,
           allowNull: false,
         },
-        code: {
-          type: Sequelize.STRING,
+        size: {
+          type: Sequelize.FLOAT,
           allowNull: false,
-          unique: true,
+        },
+        rent_price: {
+          type: Sequelize.FLOAT,
+          allowNull: false,
+        },
+        lamp: {
+          type: Sequelize.INTEGER,
+          defaultValue: 0,
+        },
+        electric_socket: {
+          type: Sequelize.INTEGER,
+          defaultValue: 0,
+        },
+        electrical_power: Sequelize.INTEGER,
+        electrical_unit: {
+          type: Sequelize.STRING,
+          defaultValue: "Watt"
+        },
+        is_toilet_exist: {
+          type: Sequelize.BOOLEAN,
+          defaultValue: false,
         },
         description: {
           type: Sequelize.STRING,
           allowNull: true,
         },
-        area: {
-          type: Sequelize.FLOAT,
-          allowNull: true,
+        is_deleted: {
+          type: Sequelize.BOOLEAN,
+          defaultValue: false,
         },
         created_at: {
           type: Sequelize.DATE,
@@ -59,7 +79,7 @@ module.exports = {
     }
   },
 
-  async down(queryInterface, Sequelize) {
+  async down(queryInterface) {
     await queryInterface.dropTable('units');
   }
 };

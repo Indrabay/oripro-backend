@@ -3,8 +3,35 @@ class UnitRepository {
     this.unitModel = unitModel
   }
 
-  async create(unitData) {
-    return await this.unitModel.create(unitData);
+  async create(unitData, ctx) {
+    ctx.log?.info({name: unitData.name}, "UnitRepository.create");
+    const {
+      name,
+      asset_id,
+      size,
+      rent_price,
+      lamp,
+      electrical_socket,
+      electrical_power,
+      electrical_unit,
+      is_toilet_exist,
+      description,
+      is_deleted,
+    } = unitData;
+    return await this.unitModel.create({
+      name,
+      asset_id,
+      size,
+      rent_price,
+      lamp,
+      electric_socket: electrical_socket,
+      electrical_power,
+      electrical_unit,
+      is_toilet_exist,
+      description,
+      is_deleted,
+      created_by: ctx.userId
+    });
   }
 
   async findById(id) {

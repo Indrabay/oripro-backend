@@ -4,9 +4,9 @@ class UnitUsecase {
   }
 
   async createUnit(data, ctx) {
-    ctx.log?.info({ data }, 'usecase_create_unit');
+    ctx.log?.info({ data }, 'UnitUsecase.create');
     // Business logic for creating a unit
-    return this.unitRepository.create(data);
+    return this.unitRepository.create(data, ctx);
   }
 
   async getAllUnits() {
