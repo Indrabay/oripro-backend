@@ -1,12 +1,8 @@
 const { Router } = require('express');
 const { body, validationResult, param } = require('express-validator');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, ensureRole } = require('../middleware/auth');
 
-function ensureRole(req, res, next) {
-  const role = req.auth?.roleName;
-  if (role === 'super_admin' || role === 'admin') return next();
-  return res.status(403).json({ message: 'Forbidden' });
-}
+
 
 function InitAssetRouter(AssetUsecase) {
   const router = Router();

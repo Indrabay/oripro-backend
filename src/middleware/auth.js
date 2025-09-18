@@ -13,4 +13,10 @@ async function authMiddleware(req, res, next) {
   }
 }
 
-module.exports = { authMiddleware };
+function ensureRole(req, res, next) {
+  const role = req.auth?.roleName;
+  if (role === 'super_admin' || role === 'admin') return next();
+  return res.status(403).json({ message: 'Forbidden' });
+}
+
+module.exports = { authMiddleware, ensureRole };

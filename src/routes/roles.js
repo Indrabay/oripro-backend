@@ -1,9 +1,9 @@
 const { Router } = require('express');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, ensureRole } = require('../middleware/auth');
 
 function InitRoleRouter(roleUsecase) {
   const router = Router();
-  router.use(authMiddleware);
+  router.use(authMiddleware, ensureRole);
 
   // GET /api/roles - List all roles
   router.get('/', async (req, res) => {

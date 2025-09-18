@@ -1,13 +1,6 @@
 const { Router } = require('express');
-const { body, validationResult, param } = require('express-validator');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, ensureRole } = require('../middleware/auth');
 
-// Create a new tenant
-function ensureRole(req, res, next) {
-  const role = req.auth?.roleName;
-  if (role === 'super_admin' || role === 'admin') return next();
-  return res.status(403).json({ message: 'Forbidden' });
-}
 function InitTenantRouter(TenantUseCase) {
   const router = Router();
 
@@ -22,7 +15,6 @@ function InitTenantRouter(TenantUseCase) {
     }
   });
 
-  // Get all tenants
   router.get('/', async (req, res) => {
     try {
       const tenants = await TenantUseCase.getAllTenants();
@@ -32,7 +24,6 @@ function InitTenantRouter(TenantUseCase) {
     }
   });
 
-  // Get tenant by ID
   router.get('/:id', async (req, res) => {
     try {
       const tenant = await TenantUseCase.getTenantById(req.params.id);
@@ -45,7 +36,6 @@ function InitTenantRouter(TenantUseCase) {
     }
   });
 
-  // Update tenant
   router.put('/:id', async (req, res) => {
     try {
       const updated = await TenantUseCase.updateTenant(req.params.id, req.body);
@@ -55,7 +45,6 @@ function InitTenantRouter(TenantUseCase) {
     }
   });
 
-  // Delete tenant
   router.delete('/:id', async (req, res) => {
     try {
       await TenantUseCase.deleteTenant(req.params.id);
@@ -67,6 +56,5 @@ function InitTenantRouter(TenantUseCase) {
 
   return router;
 }
-
 
 module.exports = {InitTenantRouter};
