@@ -18,6 +18,7 @@ const app = express();
 const UserRepository = require('./repositories/User');
 const PasswordResetTokenRepository = require('./repositories/PasswordResetToken');
 const AssetRepository = require('./repositories/Asset');
+const AssetLogRepository = require('./repositories/AssetLog');
 const UnitRepository = require('./repositories/Unit');
 const RoleRepository = require('./repositories/Role');
 const TenantRepository = require('./repositories/Tenant');
@@ -31,6 +32,7 @@ const tenantUc = require('./usecases/Tenant');
 const modelUser = require('./models/User');
 const modelRole = require('./models/Role');
 const {Asset} = require('./models/Asset');
+const modelAssetLog = require('./models/AssetLog');
 const modelUnit = require('./models/Unit');
 const modelAdminAsset = require('./models/AssetAdmin');
 const modelPasswordResetToken = require('./models/PasswordResetToken');
@@ -40,11 +42,12 @@ const modelTenant = require('./models/Tenant');
 const userRepository = new UserRepository(modelUser);
 const tokenRepository = new PasswordResetTokenRepository(modelPasswordResetToken);
 const assetRepository = new AssetRepository(Asset, modelAdminAsset);
+const assetLogRepository = new AssetLogRepository(modelAssetLog);
 const unitRepository = new UnitRepository(modelUnit);
 const roleRepository = new RoleRepository(modelRole);
 const tenantRepository = new TenantRepository(modelTenant);
 
-const assetUsecase = new assetUc(assetRepository);
+const assetUsecase = new assetUc(assetRepository, assetLogRepository);
 const authUsecase = new authUc(
   userRepository,
   process.env.JWT_SECRET,

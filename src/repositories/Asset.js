@@ -4,9 +4,8 @@ class AssetRepository {
     this.assetAdminModel = assetAdminModel;
   }
 
-  async create({ name, description, asset_type, code, address, area, status, longitude, latitude, createdBy }, ctx = {}) {
-    ctx.log?.info({ name }, 'repo_assets_create');
-    const asset = await this.assetModel.create({
+  async create(
+    {
       name,
       description,
       asset_type,
@@ -16,68 +15,105 @@ class AssetRepository {
       status,
       longitude,
       latitude,
-      created_by: createdBy
-    });
-    return asset.toJSON();
+      is_deleted,
+      createdBy,
+    },
+    ctx = {}
+  ) {
+    try {
+      ctx.log?.info({ name }, "AssetRepository.Success create");
+      const asset = await this.assetModel.create({
+        name,
+        description,
+        asset_type,
+        code,
+        address,
+        area,
+        status,
+        longitude,
+        latitude,
+        is_deleted,
+        created_by: createdBy,
+      });
+      return asset.toJSON();
+    } catch (error) {
+      ctx.log?.error({name}, `AssetRepository.Error create: ${error}`)
+      throw new Error(`error when create asset`);
+    }
   }
 
   async assignAdmin(assetId, userId, ctx = {}) {
-    ctx.log?.debug({ assetId, userId }, 'repo_assets_assign_admin');
+    ctx.log?.debug({ assetId, userId }, "repo_assets_assign_admin");
     await this.assetAdminModel.findOrCreate({
-      where: { asset_id: assetId, user_id: userId }
+      where: { asset_id: assetId, user_id: userId },
     });
   }
 
   async isAdminAssigned(assetId, userId, ctx = {}) {
-    ctx.log?.debug({ assetId, userId }, 'repo_assets_is_admin_assigned');
-    const admin = await this.assetAdminModel.findOne({ where: { asset_id: assetId, user_id: userId } });
+    ctx.log?.debug({ assetId, userId }, "repo_assets_is_admin_assigned");
+    const admin = await this.assetAdminModel.findOne({
+      where: { asset_id: assetId, user_id: userId },
+    });
     return !!admin;
   }
 
   async findById(id, ctx = {}) {
-    console.log("something in between", this.assetModel, this.assetAdminModel)
-    ctx.log?.debug({ id }, 'repo_assets_find_by_id');
+    console.log("something in between", this.assetModel, this.assetAdminModel);
+    ctx.log?.debug({ id }, "repo_assets_find_by_id");
     const asset = await this.assetModel.findByPk(id);
     return asset ? asset.toJSON() : null;
   }
 
   async listAll(ctx = {}) {
-    ctx.log?.debug({}, 'repo_assets_list_all');
-    const assets = await this.assetModel.findAll({ order: [['created_at', 'DESC']] });
-    return assets.map(a => a.toJSON());
+    ctx.log?.debug({}, "repo_assets_list_all");
+    const assets = await this.assetModel.findAll({
+      order: [["created_at", "DESC"]],
+    });
+    return assets.map((a) => a.toJSON());
   }
 
   async listForAdmin(userId, ctx = {}) {
-    ctx.log?.debug({ userId }, 'repo_assets_list_for_admin');
-    const assetAdmins = await this.assetAdminModel.findAll({ where: { user_id: userId } });
-    const assetIds = assetAdmins.map(aa => aa.asset_id);
-    const assets = await this.assetModel.findAll({ where: { id: assetIds }, order: [['created_at', 'DESC']] });
-    return assets.map(a => a.toJSON());
+    ctx.log?.debug({ userId }, "repo_assets_list_for_admin");
+    const assetAdmins = await this.assetAdminModel.findAll({
+      where: { user_id: userId },
+    });
+    const assetIds = assetAdmins.map((aa) => aa.asset_id);
+    const assets = await this.assetModel.findAll({
+      where: { id: assetIds },
+      order: [["created_at", "DESC"]],
+    });
+    return assets.map((a) => a.toJSON());
   }
 
-  async update(id, { name, description, longitude, latitude, updatedBy }, ctx = {}) {
-    ctx.log?.info({ id }, 'repo_assets_update');
+  async update(
+    id,
+    { name, description, asset_type, longitude, latitude, updatedBy },
+    ctx = {}
+  ) {
+    ctx.log?.info({ id }, "repo_assets_update");
     const asset = await this.assetModel.findByPk(id);
     if (!asset) return null;
     await asset.update({
       name: name ?? asset.name,
       description: description ?? asset.description,
+      asset_type: asset_type ?? asset.asset_type,
       longitude: longitude ?? asset.longitude,
       latitude: latitude ?? asset.latitude,
       updated_by: updatedBy ?? asset.updated_by,
-      updated_at: new Date()
+      updated_at: new Date(),
     });
     return asset.toJSON();
   }
 
   async delete(id, ctx = {}) {
-    ctx.log?.info({ id }, 'repo_assets_delete');
-    await this.assetAdminModel.destroy({ where: { asset_id: id } });
-    const deleted = await this.assetModel.destroy({ where: { id } });
-    return deleted > 0;
+    ctx.log?.info({ id }, "repo_assets_delete");
+    const asset = await this.assetModel.findByPk(id);
+    await this.assetModel.update({
+      is_deleted: true,
+      updated_by: ctx.userId,
+    });
+    return asset.toJSON();
   }
 }
 
 module.exports = AssetRepository;
-
-

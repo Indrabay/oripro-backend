@@ -39,10 +39,11 @@ function InitAssetRouter(AssetUsecase) {
         address,
         area,
         status: status ? status : 1,
+        is_deleted: false,
         longitude,
         latitude,
         createdBy: req.auth.userId
-      }, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName });
+      }, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName, userID: req.auth.userId });
       return res.status(201).json(asset);
     }
   );
@@ -94,7 +95,6 @@ function InitAssetRouter(AssetUsecase) {
       req.log?.info({ id: req.params.id }, 'route_assets_delete');
       const deleted = await AssetUsecase.deleteAsset(req.params.id, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName, userId: req.auth.userId });
       if (!deleted) return res.status(404).json({ message: 'Not found' });
-      if (deleted === 'forbidden') return res.status(403).json({ message: 'Forbidden' });
       return res.status(204).send();
     }
   );

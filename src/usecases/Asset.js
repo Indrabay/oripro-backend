@@ -1,12 +1,18 @@
 class AssetUsecase {
-  constructor(assetRepository) {
+  constructor(assetRepository, assetLogRepository) {
     this.assetRepository = assetRepository;
+    this.assetLogRepository = assetLogRepository;
   }
   async createAsset(data, ctx) {
     const asset = await this.assetRepository.create(data, ctx);
     if (ctx.roleName === 'admin') {
-      await this.assetRepository.assignAdmin(asset.id, data.ownerId, ctx);
+      await this.assetRepository.assignAdmin(asset.id, ctx.userID, ctx);
     }
+
+    if (asset) {
+      await this.assetLogRepository.create(asset, ctx)
+    }
+
     return asset;
   }
 

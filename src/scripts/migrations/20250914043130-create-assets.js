@@ -34,6 +34,10 @@ module.exports = {
       latitude: Sequelize.DOUBLE,
       created_by: Sequelize.UUID,
       updated_by: Sequelize.UUID,
+      is_deleted: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: false
+      },
       created_at: {
         type: Sequelize.DATE,
         defaultValue: Sequelize.NOW,

@@ -44,6 +44,7 @@ Asset.init({
   latitude: DataTypes.DOUBLE,
   created_by: DataTypes.UUID,
   updated_by: DataTypes.UUID,
+  is_deleted: DataTypes.BOOLEAN,
   created_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
