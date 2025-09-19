@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
+const path = require('path');
 
 dotenv.config();
 
@@ -11,6 +12,7 @@ const asset = require('./routes/assets');
 const user = require('./routes/users');
 const units = require('./routes/units');
 const tenant = require('./routes/tenants');
+const uploadsRouter = require('./routes/uploads');
 const { InitRoleRouter } = require('./routes/roles');
 const { requestContext } = require('./middleware/requestContext');
 const { metricsMiddleware, metricsHandler } = require('./services/metrics');
@@ -69,6 +71,7 @@ const userRouter = user.InitUserRouter(userUsecase);
 const unitRouter = units.InitUnitRouter(unitUsecase);
 const tenantRouter = tenant.InitTenantRouter(tenantUsecase);
 const roleRouter = InitRoleRouter(roleUsecase);
+const uploadFileRouter = uploadsRouter.InitUploadRouter();
 
 // Middleware
 app.use(helmet());
@@ -102,6 +105,8 @@ app.use(
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
+app.use(express.static(path.join(__dirname, '../public')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
 app.use('/api/auth', authRouter);
@@ -110,10 +115,12 @@ app.use('/api/users', userRouter);
 app.use('/api/units', unitRouter);
 app.use('/api/tenants', tenantRouter);
 app.use('/api/roles', roleRouter);
+app.use('/api/uploads', uploadFileRouter);
 app.get('/metrics', metricsHandler);
 
 // 404 handler
 app.use((_req, res) => {
+  console.log("im here")
   res.status(404).json({ message: 'Not Found' });
 });
 
