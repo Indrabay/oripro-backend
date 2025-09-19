@@ -1,17 +1,19 @@
 const { DataTypes, Model } = require('sequelize');
 const sequelize = require('./sequelize');
 
-const ESTATE = 1;
-const OFFICE = 2;
-const WAREHOUSE = 3;
-const SPORT = 4;
-const ENTERTAINMENTRESTAURANT = 5;
-const RESIDENCE = 6;
-const MALL = 7;
-const SUPPORTFACILITYMOSQUEITAL = 8;
-const PARKINGLOT = 9;
+const AssetTypeMap = {
+  ESTATE: 1,
+  OFFICE: 2,
+  WAREHOUSE: 3,
+  SPORT: 4,
+  ENTERTAINMENTRESTAURANT: 5,
+  RESIDENCE: 6,
+  MALL: 7,
+  SUPPORTFACILITYMOSQUEITAL: 8,
+  PARKINGLOT: 9,
+}
 
-class Asset extends Model {}
+class Asset extends Model { }
 
 Asset.init({
   id: {
@@ -39,7 +41,7 @@ Asset.init({
     defaultValue: 1,
   },
   address: DataTypes.STRING(500),
-  area: DataTypes.DECIMAL(10,2),
+  area: DataTypes.DECIMAL(10, 2),
   longitude: DataTypes.DOUBLE,
   latitude: DataTypes.DOUBLE,
   created_by: DataTypes.UUID,
@@ -64,4 +66,4 @@ Asset.init({
   ],
 });
 
-module.exports = { Asset, ESTATE, OFFICE, WAREHOUSE, SPORT, ENTERTAINMENTRESTAURANT, RESIDENCE, MALL, SUPPORTFACILITYMOSQUEITAL, PARKINGLOT };
+module.exports = {Asset, AssetTypeMap};

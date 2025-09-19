@@ -58,7 +58,6 @@ class AssetRepository {
   }
 
   async findById(id, ctx = {}) {
-    console.log("something in between", this.assetModel, this.assetAdminModel);
     ctx.log?.debug({ id }, "repo_assets_find_by_id");
     const asset = await this.assetModel.findByPk(id);
     return asset ? asset.toJSON() : null;
