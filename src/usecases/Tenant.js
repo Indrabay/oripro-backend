@@ -45,17 +45,13 @@ class TenantUseCase {
   }
 
   async saveTenantUnits(tenant, data, t) {
-    try {
-      for (let i = 0; i < data.length; i++) {
+    for (let i = 0; i < data.length; i++) {
       let dataUnit = {
         tenant_id: tenant.id,
         unit_id: data[i]
       }
 
       await this.tenantUnitRepository.create(dataUnit, t)
-    }
-    } catch (err) {
-      
     }
   }
 
