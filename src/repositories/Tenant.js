@@ -1,9 +1,11 @@
+
+
 class TenantRepository {
   constructor(tenantModel) {
     this.tenantModel = tenantModel
   }
-  async create(data) {
-    return this.tenantModel.create(data);
+  async create(data, tx = null) {
+    return this.tenantModel.create(data, {transaction: tx});
   }
 
   async findById(id) {

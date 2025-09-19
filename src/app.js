@@ -7,6 +7,7 @@ const path = require('path');
 
 dotenv.config();
 
+// define routes module
 const auth = require('./routes/auth');
 const asset = require('./routes/assets');
 const user = require('./routes/users');
@@ -18,6 +19,7 @@ const { requestContext } = require('./middleware/requestContext');
 const { metricsMiddleware, metricsHandler } = require('./services/metrics');
 
 const app = express();
+// define repository module
 const UserRepository = require('./repositories/User');
 const PasswordResetTokenRepository = require('./repositories/PasswordResetToken');
 const AssetRepository = require('./repositories/Asset');
@@ -25,7 +27,11 @@ const AssetLogRepository = require('./repositories/AssetLog');
 const UnitRepository = require('./repositories/Unit');
 const RoleRepository = require('./repositories/Role');
 const TenantRepository = require('./repositories/Tenant');
+const TenantAttachmentRepository = require('./repositories/TenantAttachment');
+const MapTenantCategoryRepository = require('./repositories/MapTenantCategory');
+const TenantUnitRepository = require('./repositories/TenantUnit');
 
+// define usecase module
 const authUc = require('./usecases/Auth');
 const assetUc = require('./usecases/Asset');
 const userUc = require('./usecases/User');
@@ -33,6 +39,7 @@ const unitUc = require('./usecases/Unit');
 const tenantUc = require('./usecases/Tenant');
 const roleUc = require('./usecases/Role');
 
+// define models database
 const modelUser = require('./models/User');
 const modelRole = require('./models/Role');
 const {Asset} = require('./models/Asset');
@@ -40,17 +47,24 @@ const modelAssetLog = require('./models/AssetLog');
 const modelUnit = require('./models/Unit');
 const modelAdminAsset = require('./models/AssetAdmin');
 const modelPasswordResetToken = require('./models/PasswordResetToken');
-const modelTenant = require('./models/Tenant');
+const { Tenant } = require('./models/Tenant');
+const {TenantAttachmentModel} = require('./models/TenantAttachment');
+const MapTenantCategory = require('./models/MapTenantCategory');
+const modelTenantUnit = require('./models/TenantUnit');
 
-
+// initialize repository
 const userRepository = new UserRepository(modelUser);
 const tokenRepository = new PasswordResetTokenRepository(modelPasswordResetToken);
 const assetRepository = new AssetRepository(Asset, modelAdminAsset);
 const assetLogRepository = new AssetLogRepository(modelAssetLog);
 const unitRepository = new UnitRepository(modelUnit);
 const roleRepository = new RoleRepository(modelRole);
-const tenantRepository = new TenantRepository(modelTenant);
+const tenantRepository = new TenantRepository(Tenant);
+const tenantAttachmentRepository = new TenantAttachmentRepository(TenantAttachmentModel)
+const mapTenantCategoryRepository = new MapTenantCategoryRepository(MapTenantCategory)
+const tenantUnitRepository = new TenantUnitRepository(modelTenantUnit)
 
+// initialize usecase
 const assetUsecase = new assetUc(assetRepository, assetLogRepository);
 const authUsecase = new authUc(
   userRepository,
@@ -62,9 +76,10 @@ const authUsecase = new authUc(
 );
 const userUsecase = new userUc(userRepository);
 const unitUsecase = new unitUc(unitRepository);
-const tenantUsecase = new tenantUc(tenantRepository);
+const tenantUsecase = new tenantUc(tenantRepository, tenantAttachmentRepository, tenantUnitRepository, mapTenantCategoryRepository);
 const roleUsecase = new roleUc(roleRepository);
 
+// initalize router
 const authRouter = auth.InitAuthRouter(authUsecase);
 const assetRouter = asset.InitAssetRouter(assetUsecase);
 const userRouter = user.InitUserRouter(userUsecase);
@@ -137,5 +152,3 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
-
-

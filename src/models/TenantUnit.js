@@ -23,3 +23,5 @@ TenantUnit.init({
   tableName: 'tenant-unit',
   timestamps: false,
 });
+
+module.exports = TenantUnit;

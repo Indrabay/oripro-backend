@@ -36,3 +36,6 @@ TenantAttachmentModel.init({
   tableName: 'tenant-attachments',
   timestamps: false,
 });
+
+module.exports = { TenantAttachmentModel, AttachmentType};
+

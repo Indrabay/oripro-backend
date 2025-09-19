@@ -3,8 +3,8 @@ class TenantUnitRepository {
     this.tenantUnitModel = tenantUnitModel;
   }
 
-  async create(data) {
-    return this.tenantUnitModel.create(data);
+  async create(data, tx) {
+    return this.tenantUnitModel.create(data, {transaction: tx});
   }
 
   async getByTenantID(id) {

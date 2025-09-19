@@ -15,9 +15,10 @@ function InitTenantRouter(TenantUseCase) {
       body('contract_documents').notEmpty().isArray(),
       body('unit_ids').notEmpty().isArray(),
       body('contract_begin_at').notEmpty(),
-      body('rent_duration').notEmpty().isNumeric(),
+      body('rent_duration').isNumeric(),
       body('rent_duration_unit').notEmpty().isString(),
       body('user_id').notEmpty().isString(),
+      body('categories').notEmpty().isArray(),
     ],
     async (req, res) => {
     try {
@@ -31,12 +32,11 @@ function InitTenantRouter(TenantUseCase) {
         contract_begin_at,
         rent_duration,
         rent_duration_unit,
+        categories,
         user_id,
       } = req.body;
       const tenant = await TenantUseCase.createTenant({
-        name, tenant_identifications, contract_documents, contract_begin_at,
-        unit_ids, rent_duration, rent_duration_unit, user_id,
-        createdBy: req.auth.userId
+        name, tenant_identifications, contract_documents, contract_begin_at, unit_ids, rent_duration, rent_duration_unit, user_id, categories,createdBy: req.auth.userId
       });
       res.status(201).json(tenant);
     } catch (err) {

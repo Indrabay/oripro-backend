@@ -3,6 +3,16 @@ const sequelize = require('./sequelize');
 
 class Tenant extends Model {}
 
+const DurationUnit = {
+  "year": 0,
+  "month": 1
+}
+
+const DurationUnitStr = {
+  0: "year",
+  1: "month"
+}
+
 Tenant.init({
   id: {
     type: DataTypes.UUID,
@@ -25,6 +35,14 @@ Tenant.init({
   contract_end_at: {
     type: DataTypes.DATE,
     allowNull: false
+  },
+  rent_duration: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  rent_duration_unit: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
   },
   code: {
     type: DataTypes.STRING,
@@ -54,4 +72,4 @@ Tenant.init({
   timestamps: false,
 });
 
-module.exports = Tenant;
+module.exports = {Tenant, DurationUnit, DurationUnitStr};
