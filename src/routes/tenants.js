@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const { body, validationResult, param } = require('express-validator');
 const { authMiddleware, ensureRole } = require('../middleware/auth');
 
 function InitTenantRouter(TenantUseCase) {
@@ -6,9 +7,37 @@ function InitTenantRouter(TenantUseCase) {
 
   router.use(authMiddleware, ensureRole);
 
-  router.post('/', async (req, res) => {
+  router.post(
+    '/', 
+    [
+      body('name').isString().notEmpty(),
+      body('tenant_identifications').notEmpty().isArray(),
+      body('contract_documents').notEmpty().isArray(),
+      body('unit_ids').notEmpty().isArray(),
+      body('contract_begin_at').notEmpty(),
+      body('rent_duration').notEmpty().isNumeric(),
+      body('rent_duration_unit').notEmpty().isString(),
+      body('user_id').notEmpty().isString(),
+    ],
+    async (req, res) => {
     try {
-      const tenant = await TenantUseCase.createTenant(req.body);
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+      const {
+        name,
+        tenant_identifications,
+        contract_documents,
+        unit_ids,
+        contract_begin_at,
+        rent_duration,
+        rent_duration_unit,
+        user_id,
+      } = req.body;
+      const tenant = await TenantUseCase.createTenant({
+        name, tenant_identifications, contract_documents, contract_begin_at,
+        unit_ids, rent_duration, rent_duration_unit, user_id,
+        createdBy: req.auth.userId
+      });
       res.status(201).json(tenant);
     } catch (err) {
       res.status(400).json({ error: err.message });

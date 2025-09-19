@@ -9,17 +9,27 @@ Tenant.init({
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true
   },
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true,
+  },
   user_id: {
     type: DataTypes.UUID,
     allowNull: false,
   },
-  unit_id: {
-    type: DataTypes.UUID,
-    allowNull: false
-  },
-  due_date_payment: {
+  contract_begin_at: {
     type: DataTypes.DATE,
     allowNull: false
+  },
+  contract_end_at: {
+    type: DataTypes.DATE,
+    allowNull: false
+  },
+  code: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true,
   },
   created_by: {
     type: DataTypes.UUID,
