@@ -12,14 +12,25 @@ module.exports = {
         type: Sequelize.UUID,
         allowNull: false,
       },
-      unit_id: {
-        type: Sequelize.UUID,
-        allowNull: false
-      },
-      due_date_payment: {
+      contract_begin_at: {
         type: Sequelize.DATE,
         allowNull: false
       },
+      contract_end_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+      },
+      code: {
+        type:Sequelize.STRING,
+        unique: true,
+        allowNull: false,
+      },
+      status: {
+        type: Sequelize.INTEGER,
+        defaultValue: 1,
+      },
+      rent_duration: Sequelize.INTEGER,
+      rent_duration_unit: Sequelize.INTEGER,
       created_by: Sequelize.UUID,
       updated_by: Sequelize.UUID,
       created_at: {
