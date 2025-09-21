@@ -18,35 +18,42 @@ class AssetRepository {
       is_deleted,
       createdBy,
     },
-    ctx = {}
+    ctx = {},
+    t = null
   ) {
     try {
       ctx.log?.info({ name }, "AssetRepository.Success create");
-      const asset = await this.assetModel.create({
-        name,
-        description,
-        asset_type,
-        code,
-        address,
-        area,
-        status,
-        longitude,
-        latitude,
-        is_deleted,
-        created_by: createdBy,
-      });
+      const asset = await this.assetModel.create(
+        {
+          name,
+          description,
+          asset_type,
+          code,
+          address,
+          area,
+          status,
+          longitude,
+          latitude,
+          is_deleted,
+          created_by: createdBy,
+        },
+        { transaction: t }
+      );
       return asset.toJSON();
     } catch (error) {
-      ctx.log?.error({name}, `AssetRepository.Error create: ${error}`)
+      ctx.log?.error({ name }, `AssetRepository.Error create: ${error}`);
       throw new Error(`error when create asset`);
     }
   }
 
-  async assignAdmin(assetId, userId, ctx = {}) {
+  async assignAdmin(assetId, userId, ctx = {}, t = null) {
     ctx.log?.debug({ assetId, userId }, "repo_assets_assign_admin");
-    await this.assetAdminModel.findOrCreate({
-      where: { asset_id: assetId, user_id: userId },
-    });
+    await this.assetAdminModel.findOrCreate(
+      {
+        where: { asset_id: assetId, user_id: userId },
+      },
+      { transaction: t }
+    );
   }
 
   async isAdminAssigned(assetId, userId, ctx = {}) {

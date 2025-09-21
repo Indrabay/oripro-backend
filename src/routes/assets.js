@@ -18,6 +18,8 @@ function InitAssetRouter(AssetUsecase) {
       body('address').isString().notEmpty(),
       body('area').isFloat().notEmpty(),
       body('status').optional().isInt(),
+      body('sketch').optional(),
+      body('photos').optional().isArray(),
       body('description').optional().isString(),
       body('longitude').isFloat({ min: -180, max: 180 }).notEmpty(),
       body('latitude').isFloat({ min: -90, max: 90 }).notEmpty()
@@ -25,7 +27,7 @@ function InitAssetRouter(AssetUsecase) {
     async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-      const { name, asset_type, code, address, area, status, description, longitude, latitude } = req.body;
+      const { name, asset_type, code, address, area, status, description, longitude, latitude, sketch, photos } = req.body;
       req.log?.info({ name }, 'route_assets_create');
       const asset = await AssetUsecase.createAsset({
         name,
@@ -38,6 +40,8 @@ function InitAssetRouter(AssetUsecase) {
         is_deleted: false,
         longitude,
         latitude,
+        sketch,
+        photos,
         createdBy: req.auth.userId
       }, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName, userID: req.auth.userId });
       return res.status(201).json(asset);
