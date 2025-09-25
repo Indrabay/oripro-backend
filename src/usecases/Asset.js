@@ -1,5 +1,5 @@
 const sequelize = require("../models/sequelize");
-const { AttachmentType } = require('../models/AssetAttachment');
+const { AttachmentType } = require("../models/AssetAttachment");
 
 class AssetUsecase {
   constructor(assetRepository, assetLogRepository, assetAttachmentRepository) {
@@ -38,10 +38,10 @@ class AssetUsecase {
             );
           }
           if (data.sketch) {
-            await this.createAttachment(asset.id, [data.sketch], "sketch", t)
+            await this.createAttachment(asset.id, [data.sketch], "sketch", t);
           }
           if (data.photos) {
-            await this.createAttachment(asset.id, data.photos, "photo", t)
+            await this.createAttachment(asset.id, data.photos, "photo", t);
           }
           await this.assetLogRepository.create(asset, ctx, t);
         }
@@ -51,8 +51,11 @@ class AssetUsecase {
 
       return result;
     } catch (error) {
-      ctx.log?.error({name: data.name, error: error.message}, "AssetUsecase.error");
-      throw new Error(error.message)
+      ctx.log?.error(
+        { name: data.name, error: error.message },
+        "AssetUsecase.error"
+      );
+      throw new Error(error.message);
     }
   }
 
@@ -62,7 +65,7 @@ class AssetUsecase {
         asset_id: assetId,
         url: data[i],
         attachment_type: AttachmentType[type],
-      }
+      };
 
       await this.assetAttachmentRepository.create(attachmentData, trx);
     }
@@ -86,11 +89,34 @@ class AssetUsecase {
       );
       if (!ok) return "forbidden";
     }
+    const attachments = await this.assetAttachmentRepository.getByAssetID(
+      asset.id
+    );
+    if (attachments.length < 1) {
+      return asset;
+    }
+    let sketchs = [];
+    let photos = [];
+    for (let i = 0; i < attachments.length; i++) {
+      switch (attachments[i].attachment_type) {
+        case AttachmentType["photo"]:
+          photos.push(attachments[i].url);
+          break;
+        case AttachmentType["sketch"]:
+          sketchs.push(attachments[i].url);
+          break;
+        default:
+          break;
+      }
+    }
+
+    asset.photos = photos;
+    asset.sketch = sketchs;
     return asset;
   }
 
   async updateAsset(id, data, ctx) {
-    const asset = await this.assetRepository.findById(id, ctx);
+    let asset = await this.assetRepository.findById(id, ctx);
     if (!asset) return null;
     if (ctx.roleName !== "super_admin") {
       const ok = await this.assetRepository.isAdminAssigned(
@@ -100,11 +126,15 @@ class AssetUsecase {
       );
       if (!ok) return "forbidden";
     }
-    return await this.assetRepository.update(
+    asset = await this.assetRepository.update(
       asset.id,
       { ...data, updatedBy: ctx.userId },
       ctx
     );
+
+    await this.assetLogRepository.create(asset, ctx);
+
+    return asset;
   }
 
   async deleteAsset(id, ctx) {

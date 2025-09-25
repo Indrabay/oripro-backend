@@ -81,21 +81,10 @@ function InitAssetRouter(AssetUsecase) {
     ],
     async (req, res) => {
       req.log?.info({ id: req.params.id }, 'route_assets_update');
-      const updated = await AssetUsecase.updateAsset(req.params.id, req.body, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName, userId: req.auth.userId });
+      const updated = await AssetUsecase.updateAsset(req.params.id, req.body, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName, userID: req.auth.userId });
       if (!updated) return res.status(404).json({ message: 'Not found' });
       if (updated === 'forbidden') return res.status(403).json({ message: 'Forbidden' });
       return res.json(updated);
-    }
-  );
-
-  router.delete(
-    '/:id',
-    [param('id').isString().notEmpty()],
-    async (req, res) => {
-      req.log?.info({ id: req.params.id }, 'route_assets_delete');
-      const deleted = await AssetUsecase.deleteAsset(req.params.id, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName, userId: req.auth.userId });
-      if (!deleted) return res.status(404).json({ message: 'Not found' });
-      return res.status(204).send();
     }
   );
 
