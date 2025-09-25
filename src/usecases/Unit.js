@@ -1,12 +1,31 @@
+const sequelize = require("../models/sequelize");
+
 class UnitUsecase {
-  constructor(unitRepository) {
+  constructor(unitRepository, unitAttachmentRepository) {
     this.unitRepository = unitRepository;
+    this.unitAttachmentRepository = unitAttachmentRepository;
   }
 
   async createUnit(data, ctx) {
-    ctx.log?.info({ data }, 'UnitUsecase.create');
+    ctx.log?.info({ data }, "UnitUsecase.create");
     // Business logic for creating a unit
-    return this.unitRepository.create(data, ctx);
+    const result = await sequelize.transaction(async (t) => {
+      const unit = await this.unitRepository.create(data, ctx, t);
+      if (unit && data.photos) {
+        for (let i = 0; i < data.photos.length; i++) {
+          let createAttachmentData = {
+            unit_id: unit.id,
+            url: data.photos[i],
+          };
+
+          await this.unitAttachmentRepository.create(createAttachmentData, ctx, t);
+        }
+      }
+
+      return unit;
+    });
+
+    return result;
   }
 
   async getAllUnits() {
@@ -18,8 +37,17 @@ class UnitUsecase {
     // Business logic for retrieving a unit by ID
     const unit = await this.unitRepository.findById(id);
     if (!unit) {
-      throw new Error('Unit not found');
+      throw new Error("Unit not found");
     }
+
+    const attachments = await this.unitAttachmentRepository.getByUnitID(unit.id)
+    let photos = []
+    if (attachments.length > 0) {
+      for (let i = 0; i < attachments.length; i++) {
+        photos.push(attachments[i].url)
+      }
+    }
+    unit.photos = photos;
     return unit;
   }
 
@@ -27,18 +55,9 @@ class UnitUsecase {
     // Business logic for updating a unit
     const unit = await this.unitRepository.findById(id);
     if (!unit) {
-      throw new Error('Unit not found');
+      throw new Error("Unit not found");
     }
     return this.unitRepository.update(id, data);
-  }
-
-  async deleteUnit(id) {
-    // Business logic for deleting a unit
-    const unit = await this.unitRepository.findById(id);
-    if (!unit) {
-      throw new Error('Unit not found');
-    }
-    return this.unitRepository.delete(id);
   }
 }
 

@@ -31,6 +31,7 @@ const TenantAttachmentRepository = require('./repositories/TenantAttachment');
 const MapTenantCategoryRepository = require('./repositories/MapTenantCategory');
 const TenantUnitRepository = require('./repositories/TenantUnit');
 const AssetAttachmentRepository = require('./repositories/AssetAttachment');
+const UnitAttachmentRepository = require('./repositories/UnitAttachment');
 
 // define usecase module
 const authUc = require('./usecases/Auth');
@@ -53,6 +54,7 @@ const {TenantAttachmentModel} = require('./models/TenantAttachment');
 const MapTenantCategory = require('./models/MapTenantCategory');
 const modelTenantUnit = require('./models/TenantUnit');
 const { AssetAttachment } = require('./models/AssetAttachment');
+const modelUnitAttachment = require('./models/UnitAttachment');
 
 // initialize repository
 const userRepository = new UserRepository(modelUser);
@@ -66,6 +68,7 @@ const tenantAttachmentRepository = new TenantAttachmentRepository(TenantAttachme
 const mapTenantCategoryRepository = new MapTenantCategoryRepository(MapTenantCategory)
 const tenantUnitRepository = new TenantUnitRepository(modelTenantUnit)
 const assetAttachmentRepository = new AssetAttachmentRepository(AssetAttachment);
+const unitAttachmentRepository = new UnitAttachmentRepository(modelUnitAttachment);
 
 // initialize usecase
 const assetUsecase = new assetUc(assetRepository, assetLogRepository, assetAttachmentRepository);
@@ -78,7 +81,7 @@ const authUsecase = new authUc(
   roleRepository
 );
 const userUsecase = new userUc(userRepository);
-const unitUsecase = new unitUc(unitRepository);
+const unitUsecase = new unitUc(unitRepository, unitAttachmentRepository);
 const tenantUsecase = new tenantUc(tenantRepository, tenantAttachmentRepository, tenantUnitRepository, mapTenantCategoryRepository);
 const roleUsecase = new roleUc(roleRepository);
 

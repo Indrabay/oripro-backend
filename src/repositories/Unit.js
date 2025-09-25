@@ -3,7 +3,7 @@ class UnitRepository {
     this.unitModel = unitModel
   }
 
-  async create(unitData, ctx) {
+  async create(unitData, ctx, tx = null) {
     ctx.log?.info({name: unitData.name}, "UnitRepository.create");
     const {
       name,
@@ -18,7 +18,7 @@ class UnitRepository {
       description,
       is_deleted,
     } = unitData;
-    return await this.unitModel.create({
+    const unit = await this.unitModel.create({
       name,
       asset_id,
       size,
@@ -31,11 +31,14 @@ class UnitRepository {
       description,
       is_deleted,
       created_by: ctx.userId
-    });
+    }, {transaction: tx});
+
+    return unit.toJSON();
   }
 
   async findById(id) {
-    return await this.unitModel.findByPk(id);
+    const unit = await this.unitModel.findByPk(id);
+    return unit.toJSON();
   }
 
   async findAll(filter = {}) {

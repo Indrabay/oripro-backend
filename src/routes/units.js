@@ -19,12 +19,13 @@ function InitUnitRouter(UnitUsecase) {
       body('electrical_socket').optional().isNumeric(),
       body('electrical_power').notEmpty().isNumeric(),
       body('electrical_unit').optional().isString(),
-      body('is_toilet_exist').notEmpty().isBoolean()
+      body('is_toilet_exist').notEmpty().isBoolean(),
+      body('photos').isArray().optional(),
     ],
     async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-      const { name, asset_id, size, rent_price, lamp, electrical_socket, electrical_power, electrical_unit, is_toilet_exist, description } = req.body;
+      const { name, asset_id, size, rent_price, lamp, electrical_socket, electrical_power, electrical_unit, is_toilet_exist, description, photos } = req.body;
       req.log?.info({ name }, 'route_units_create');
       const unit = await UnitUsecase.createUnit({
         name,
@@ -37,6 +38,7 @@ function InitUnitRouter(UnitUsecase) {
         electrical_unit,
         is_toilet_exist,
         size,
+        photos,
         createdBy: req.auth.userId
       }, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName, userId: req.auth.userId });
       return res.status(201).json(unit);
