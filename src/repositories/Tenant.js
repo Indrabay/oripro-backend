@@ -9,7 +9,8 @@ class TenantRepository {
   }
 
   async findById(id) {
-    return this.tenantModel.findByPk(id);
+    const tenant = await this.tenantModel.findByPk(id);
+    return tenant.toJSON();
   }
 
   async findAll(where = {}) {
@@ -21,13 +22,6 @@ class TenantRepository {
     if (!tenant) return null;
     await tenant.update(data);
     return tenant;
-  }
-
-  async delete(id) {
-    const tenant = await this.tenantModel.findByPk(id);
-    if (!tenant) return null;
-    await tenant.destroy();
-    return true;
   }
 }
 
