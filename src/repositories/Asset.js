@@ -1,3 +1,5 @@
+const { Op, where } = require("sequelize");
+
 class AssetRepository {
   constructor(assetModel, assetAdminModel) {
     this.assetModel = assetModel;
@@ -70,15 +72,57 @@ class AssetRepository {
     return asset ? asset.toJSON() : null;
   }
 
-  async listAll(ctx = {}) {
+  async listAll(queryParams, ctx = {}) {
     ctx.log?.debug({}, "repo_assets_list_all");
-    const assets = await this.assetModel.findAll({
-      order: [["created_at", "DESC"]],
-    });
+    let whereQuery = {};
+    if (queryParams.name || queryParams.asset_type) {
+      whereQuery.where = {};
+      if (queryParams.name) {
+        let nameParam = queryParams.name.toLowerCase();
+        whereQuery.where.name = {
+          [Op.like]: `%${nameParam}%`,
+        };
+      }
+
+      if (queryParams.asset_type) {
+        whereQuery.where.asset_type = queryParams.asset_type
+      }
+    }
+    if (queryParams.limit) {
+      whereQuery.limit = parseInt(queryParams.limit);
+    }
+
+    if (queryParams.offset) {
+      whereQuery.offset = parseInt(queryParams.offset);
+    }
+
+    let order;
+    if (queryParams.order) {
+      switch (queryParams.order) {
+        case "oldest":
+          order = [["updated_at", "ASC"]];
+          break;
+        case "newest":
+          order = [["updated_at", "DESC"]];
+          break;
+        case "a-z":
+          order = [["name", "ASC"]];
+          break;
+        case "z-a":
+          order = [["name", "DESC"]];
+        default:
+          break;
+      }
+
+      whereQuery.order = order;
+    }
+
+    console.log(whereQuery);
+    const assets = await this.assetModel.findAll(whereQuery);
     return assets.map((a) => a.toJSON());
   }
 
-  async listForAdmin(userId, ctx = {}) {
+  async listForAdmin(userId, queryParams = {}, ctx = {}) {
     ctx.log?.debug({ userId }, "repo_assets_list_for_admin");
     const assetAdmins = await this.assetAdminModel.findAll({
       where: { user_id: userId },

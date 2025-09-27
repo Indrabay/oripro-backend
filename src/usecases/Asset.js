@@ -71,11 +71,11 @@ class AssetUsecase {
     }
   }
 
-  async listAssets(ctx) {
+  async listAssets(queryParams, ctx) {
     if (ctx.roleName === "super_admin") {
-      return await this.assetRepository.listAll(ctx);
+      return await this.assetRepository.listAll(queryParams, ctx);
     }
-    return await this.assetRepository.listForAdmin(ctx.userId, ctx);
+    return await this.assetRepository.listForAdmin(ctx.userId, queryParams, ctx);
   }
 
   async getAsset(id, ctx) {
