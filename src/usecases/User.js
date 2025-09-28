@@ -1,3 +1,5 @@
+const bcrypt = require('bcryptjs');
+
 class UserUsecase {
   constructor(userRepository) {
     this.userRepository = userRepository;
@@ -25,8 +27,13 @@ class UserUsecase {
   async createUser(data, ctx) {
     const existingUser = await this.userRepository.findByEmail(data.email, ctx);
     if (existingUser) return 'exists';
+    
+    // Hash password before saving
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+    
     const user = await this.userRepository.create({
       ...data,
+      password: hashedPassword,
       createdBy: ctx.userId
     }, ctx);
     const { password, ...userWithoutPassword } = user;
@@ -40,10 +47,14 @@ class UserUsecase {
       const existingUser = await this.userRepository.findByEmail(data.email, ctx);
       if (existingUser) return 'exists';
     }
-    const updatedUser = await this.userRepository.update(id, {
-      ...data,
-      updatedBy: ctx.userId
-    }, ctx);
+    
+    // Hash password if it's being updated
+    const updateData = { ...data, updatedBy: ctx.userId };
+    if (data.password) {
+      updateData.password = await bcrypt.hash(data.password, 10);
+    }
+    
+    const updatedUser = await this.userRepository.update(id, updateData, ctx);
     if (!updatedUser) return null;
     const { password, ...userWithoutPassword } = updatedUser;
     return userWithoutPassword;
@@ -55,6 +66,12 @@ class UserUsecase {
     if (user.id === ctx.userId) return 'self';
     const deleted = await this.userRepository.delete(id, ctx);
     return deleted;
+  }
+
+  async getUserPermissions(userId, ctx) {
+    ctx.log?.info({ userId }, 'usecase_get_user_permissions');
+    const permissions = await this.userRepository.getUserPermissions(userId, ctx);
+    return permissions;
   }
 }
 

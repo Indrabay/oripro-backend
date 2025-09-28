@@ -26,4 +26,28 @@ Role.init({
   timestamps: false,
 });
 
+// Define associations
+Role.associate = (models) => {
+  // Association with RoleMenuPermission
+  Role.hasMany(models.RoleMenuPermission, {
+    as: 'menuPermissions',
+    foreignKey: 'role_id',
+    onDelete: 'CASCADE',
+  });
+
+  // Many-to-many relationship with Menu through RoleMenuPermission
+  Role.belongsToMany(models.Menu, {
+    through: models.RoleMenuPermission,
+    as: 'menus',
+    foreignKey: 'role_id',
+    otherKey: 'menu_id',
+  });
+
+  // Association with User
+  Role.hasMany(models.User, {
+    as: 'users',
+    foreignKey: 'role_id',
+  });
+};
+
 module.exports = Role;

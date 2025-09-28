@@ -9,12 +9,12 @@ class UnitUsecase {
     return this.unitRepository.create(data, ctx);
   }
 
-  async getAllUnits() {
+  async getAllUnits(ctx) {
     // Business logic for retrieving all units
     return this.unitRepository.findAll();
   }
 
-  async getUnitById(id) {
+  async getUnitById(id, ctx) {
     // Business logic for retrieving a unit by ID
     const unit = await this.unitRepository.findById(id);
     if (!unit) {
@@ -23,7 +23,7 @@ class UnitUsecase {
     return unit;
   }
 
-  async updateUnit(id, data) {
+  async updateUnit(id, data, ctx) {
     // Business logic for updating a unit
     const unit = await this.unitRepository.findById(id);
     if (!unit) {
@@ -32,7 +32,7 @@ class UnitUsecase {
     return this.unitRepository.update(id, data);
   }
 
-  async deleteUnit(id) {
+  async deleteUnit(id, ctx) {
     // Business logic for deleting a unit
     const unit = await this.unitRepository.findById(id);
     if (!unit) {

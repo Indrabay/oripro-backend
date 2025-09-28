@@ -9,7 +9,7 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 const env = process.env.NODE_ENV || 'postgres';
-const config = require(__dirname + '/../config/config.json')[env];
+const config = require(__dirname + '/../../config/config.json')[env];
 const db = {};
 
 console.log('config', config)

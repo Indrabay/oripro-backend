@@ -43,13 +43,13 @@ class UnitRepository {
   }
 
   async update(id, updateData) {
-    const unit = await this.unitModel.findById(id);
+    const unit = await this.unitModel.findByPk(id);
     if (!unit) return null;
     return await unit.update(updateData);
   }
 
   async delete(id) {
-    const unit = await this.unitModel.findById(id);
+    const unit = await this.unitModel.findByPk(id);
     if (!unit) return null;
     await unit.destroy();
     return unit;
