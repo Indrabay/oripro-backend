@@ -62,7 +62,7 @@ Asset.init({
   timestamps: false,
   indexes: [
     { fields: ['code'] },
-    { fields: ['assert_type'] },
+    { fields: ['asset_type'] },
   ],
 });
 

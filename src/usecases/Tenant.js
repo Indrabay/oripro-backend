@@ -7,11 +7,13 @@ const { AttachmentType } = require('../models/TenantAttachment');
 
 
 class TenantUseCase {
-  constructor(tenantRepository, tenantAttachmentRepository, tenantUnitRepository, tenantCategoryMapRepo) {
+  constructor(tenantRepository, tenantAttachmentRepository, tenantUnitRepository, tenantCategoryMapRepo, tenantCategoryRepo, unitRepository) {
     this.tenantRepository = tenantRepository;
     this.tenantAttachmentRepository = tenantAttachmentRepository;
     this.tenantUnitRepository = tenantUnitRepository;
     this.tenantCategoryMapRepo = tenantCategoryMapRepo;
+    this.tenantCategoryRepo = tenantCategoryRepo;
+    this.unitRepository = unitRepository;
   }
 
   async createTenant(data) {
@@ -98,7 +100,52 @@ class TenantUseCase {
   }
 
   async getTenantById(id) {
-    return this.tenantRepository.findById(id);
+    const tenant = await this.tenantRepository.findById(id);
+
+    if (tenant) {
+      const tenantUnits = await this.tenantUnitRepository.getByTenantID(tenant.id);
+      
+      if (tenantUnits.length > 0) {
+        let units = []
+        for (let i = 0; i < tenantUnits.length; i++) {
+          let unit = await this.unitRepository.findById(tenantUnits[i].unit_id);
+          console.log('tenant', unit)
+          units.push(unit);
+        }
+
+        tenant.units = units;
+      }
+
+      const attachments = await this.tenantAttachmentRepository.getByTenantID(tenant.id)
+      if (attachments.length > 0) {
+        let idAttachments =[];
+        let contractAttachments =[];
+        for (let i = 0; i < attachments.length; i++) {
+          if (attachments[i].attachment_type == AttachmentType['id']) {
+            idAttachments.push(attachments[i].url)
+          } else {
+            contractAttachments.push(attachments[i].url)
+          }
+        }
+
+        tenant.tenant_identifications = idAttachments;
+        tenant.contract_documents = contractAttachments;
+      }
+
+      const tenantCategories = await this.tenantCategoryMapRepo.findByTenantID(tenant.id)
+      if (tenantCategories.length > 0) {
+        let categories = []
+        for (let i = 0; i < tenantCategories.length; i++) {
+          let category = await this.tenantCategoryRepo.getByID(tenantCategories[i].category_id)
+
+          categories.push(category)
+        }
+
+        tenant.categories = categories;
+      }
+    }
+
+    return tenant;
   }
 
   async getAllTenants(filter = {}) {

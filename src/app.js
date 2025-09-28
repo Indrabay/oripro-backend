@@ -32,6 +32,9 @@ const TenantAttachmentRepository = require('./repositories/TenantAttachment');
 const MapTenantCategoryRepository = require('./repositories/MapTenantCategory');
 const TenantUnitRepository = require('./repositories/TenantUnit');
 const MenuRepository = require('./repositories/Menu');
+const AssetAttachmentRepository = require('./repositories/AssetAttachment');
+const UnitAttachmentRepository = require('./repositories/UnitAttachment');
+const TenantCategoryRepository = require('./repositories/TenantCategory');
 
 // define usecase module
 const authUc = require('./usecases/Auth');
@@ -56,6 +59,9 @@ const MapTenantCategory = require('./models/MapTenantCategory');
 const modelTenantUnit = require('./models/TenantUnit');
 const modelMenu = require('./models/Menu');
 const modelRoleMenuPermission = require('./models/RoleMenuPermission');
+const { AssetAttachment } = require('./models/AssetAttachment');
+const modelUnitAttachment = require('./models/UnitAttachment');
+const modelTenantCategory = require('./models/TenantCategory');
 
 // initialize repository
 const userRepository = new UserRepository(modelUser);
@@ -69,9 +75,12 @@ const tenantAttachmentRepository = new TenantAttachmentRepository(TenantAttachme
 const mapTenantCategoryRepository = new MapTenantCategoryRepository(MapTenantCategory)
 const tenantUnitRepository = new TenantUnitRepository(modelTenantUnit)
 const menuRepository = new MenuRepository(modelMenu)
+const assetAttachmentRepository = new AssetAttachmentRepository(AssetAttachment);
+const unitAttachmentRepository = new UnitAttachmentRepository(modelUnitAttachment);
+const tenantCategoryRepository = new TenantCategoryRepository(modelTenantCategory);
 
 // initialize usecase
-const assetUsecase = new assetUc(assetRepository, assetLogRepository);
+const assetUsecase = new assetUc(assetRepository, assetLogRepository, assetAttachmentRepository);
 const authUsecase = new authUc(
   userRepository,
   process.env.JWT_SECRET,
@@ -81,8 +90,8 @@ const authUsecase = new authUc(
   roleRepository
 );
 const userUsecase = new userUc(userRepository);
-const unitUsecase = new unitUc(unitRepository);
-const tenantUsecase = new tenantUc(tenantRepository, tenantAttachmentRepository, tenantUnitRepository, mapTenantCategoryRepository);
+const unitUsecase = new unitUc(unitRepository, unitAttachmentRepository);
+const tenantUsecase = new tenantUc(tenantRepository, tenantAttachmentRepository, tenantUnitRepository, mapTenantCategoryRepository, tenantCategoryRepository, unitRepository);
 const roleUsecase = new roleUc(roleRepository);
 const menuUsecase = new menuUc(menuRepository);
 
