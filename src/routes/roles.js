@@ -15,38 +15,6 @@ function InitRoleRouter(roleUsecase) {
     } catch (error) {
       req.log?.error({ error: error.message, stack: error.stack }, 'route_roles_list_error');
       
-      // Return mock data for development/testing
-      if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV !== 'production') {
-        req.log?.info({}, 'returning_mock_roles_data');
-        return res.json([
-          {
-            id: '1',
-            name: 'Super Admin',
-            level: 100
-          },
-          {
-            id: '2',
-            name: 'Admin',
-            level: 50
-          },
-          {
-            id: '3',
-            name: 'Manager',
-            level: 30
-          },
-          {
-            id: '4',
-            name: 'Staff',
-            level: 20
-          },
-          {
-            id: '5',
-            name: 'User',
-            level: 10
-          }
-        ]);
-      }
-      
       return res.status(500).json({ 
         message: 'Internal Server Error',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined

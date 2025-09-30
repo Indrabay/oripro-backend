@@ -59,7 +59,6 @@ class UnitUsecase {
     }
     return this.unitRepository.update(id, data);
   }
-<<<<<<< HEAD
 
   async deleteUnit(id, ctx) {
     // Business logic for deleting a unit
@@ -69,8 +68,6 @@ class UnitUsecase {
     }
     return this.unitRepository.delete(id);
   }
-=======
->>>>>>> 54f7e8b8006834d18dd03baa66b9403201712e25
 }
 
 module.exports = UnitUsecase;

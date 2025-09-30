@@ -53,43 +53,6 @@ function InitUnitRouter(UnitUsecase) {
     } catch (error) {
       req.log?.error({ error: error.message, stack: error.stack }, 'route_units_list_error');
       
-      // Return mock data for development/testing
-      if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV !== 'production') {
-        req.log?.info({}, 'returning_mock_units_data');
-        return res.json([
-          {
-            id: '1',
-            name: 'Unit 1A',
-            asset_id: '1',
-            description: 'Unit kantor lantai 1',
-            size: 50.0,
-            lamp: 4,
-            rent_price: 5000000,
-            electrical_socket: 8,
-            electrical_power: 2200,
-            electrical_unit: 'Watt',
-            is_toilet_exist: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          },
-          {
-            id: '2',
-            name: 'Unit 2A',
-            asset_id: '1',
-            description: 'Unit kantor lantai 2',
-            size: 75.0,
-            lamp: 6,
-            rent_price: 7500000,
-            electrical_socket: 12,
-            electrical_power: 3300,
-            electrical_unit: 'Watt',
-            is_toilet_exist: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        ]);
-      }
-      
       return res.status(500).json({ 
         message: 'Internal Server Error',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined

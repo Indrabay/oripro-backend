@@ -125,41 +125,6 @@ function InitAssetRouter(AssetUsecase) {
     } catch (error) {
       req.log?.error({ error: error.message, stack: error.stack }, 'route_assets_list_error');
       
-      // Return mock data for development/testing
-      if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV !== 'production') {
-        req.log?.info({}, 'returning_mock_assets_data');
-        return res.json([
-          {
-            id: '1',
-            name: 'Gedung A',
-            asset_type: 1,
-            code: 'GA001',
-            address: 'Jl. Contoh No. 1',
-            area: 1000.5,
-            status: 1,
-            description: 'Gedung perkantoran',
-            longitude: 106.8456,
-            latitude: -6.2088,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          },
-          {
-            id: '2',
-            name: 'Gedung B',
-            asset_type: 2,
-            code: 'GB001',
-            address: 'Jl. Contoh No. 2',
-            area: 2000.0,
-            status: 1,
-            description: 'Gedung komersial',
-            longitude: 106.8500,
-            latitude: -6.2100,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        ]);
-      }
-      
       return res.status(500).json({ 
         message: 'Internal Server Error',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined

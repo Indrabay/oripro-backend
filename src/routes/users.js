@@ -16,41 +16,6 @@ function InitUserRouter(userUsecase) {
     } catch (error) {
       req.log?.error({ error: error.message, stack: error.stack }, 'route_users_list_error');
       
-      // Return mock data for development/testing
-      if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV !== 'production') {
-        req.log?.info({}, 'returning_mock_users_data');
-        return res.json([
-          {
-            id: '1',
-            email: 'admin@example.com',
-            name: 'Admin User',
-            role_id: '1',
-            status: 'active',
-            role: {
-              id: '1',
-              name: 'Super Admin',
-              level: 100
-            },
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          },
-          {
-            id: '2',
-            email: 'user@example.com',
-            name: 'Regular User',
-            role_id: '2',
-            status: 'active',
-            role: {
-              id: '2',
-              name: 'User',
-              level: 10
-            },
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        ]);
-      }
-      
       return res.status(500).json({ 
         message: 'Internal Server Error',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
