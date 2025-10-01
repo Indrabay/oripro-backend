@@ -66,9 +66,9 @@ const modelUnitAttachment = require('./models/UnitAttachment');
 const modelTenantCategory = require('./models/TenantCategory');
 
 // initialize repository
-const userRepository = new UserRepository(modelUser);
+const userRepository = new UserRepository(modelUser, modelRole);
 const tokenRepository = new PasswordResetTokenRepository(modelPasswordResetToken);
-const assetRepository = new AssetRepository(Asset, modelAdminAsset);
+const assetRepository = new AssetRepository(Asset, modelAdminAsset, modelUser);
 const assetLogRepository = new AssetLogRepository(modelAssetLog);
 const unitRepository = new UnitRepository(modelUnit);
 const roleRepository = new RoleRepository(modelRole, modelRoleMenuPermission);

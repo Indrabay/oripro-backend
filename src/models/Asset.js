@@ -66,4 +66,14 @@ Asset.init({
   ],
 });
 
+Asset.associate = (models) => {
+  Asset.belongsTo(models.User, {
+    foreignKey: 'created_by',
+    as: 'createdBy',
+  });
+  Asset.belongsTo(models.User, {
+    foreignKey: 'updated_by',
+    as: 'updatedBy',
+  });
+};
 module.exports = {Asset, AssetTypeMap};

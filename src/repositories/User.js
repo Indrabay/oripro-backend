@@ -1,6 +1,7 @@
 class UserRepository {
-  constructor(userModel) {
+  constructor(userModel, roleModel) {
     this.userModel = userModel
+    this.roleModel = roleModel
   }
 
   async findByEmail(email, ctx = {}) {
@@ -14,15 +15,9 @@ class UserRepository {
   async findById(id, ctx = {}) {
     ctx.log?.debug({ id }, 'repo_find_user_by_id');
     try {
-      // Try to get Role model from sequelize
-      const RoleModel = this.userModel.sequelize.models.Role;
-      if (!RoleModel) {
-        throw new Error('Role model not found');
-      }
-      
       const user = await this.userModel.findByPk(id, {
         include: [{
-          model: RoleModel,
+          model: this.roleModel,
           as: 'role',
           attributes: ['id', 'name', 'level']
         }]
@@ -37,7 +32,7 @@ class UserRepository {
         
         const userData = user.toJSON();
         
-        const RoleModel = this.userModel.sequelize.models.Role;
+        const RoleModel = this.roleModel;
         if (RoleModel && userData.role_id) {
           const role = await RoleModel.findByPk(userData.role_id, {
             attributes: ['id', 'name', 'level']

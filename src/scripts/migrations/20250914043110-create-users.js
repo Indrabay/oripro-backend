@@ -23,6 +23,10 @@ module.exports = {
         type: Sequelize.INTEGER,
         references: { model: 'roles', key: 'id' },
       },
+      status: {
+        type: Sequelize.INTEGER,
+        defaultValue: 1,
+      },
       created_by: Sequelize.UUID,
       updated_by: Sequelize.UUID,
       created_at: {

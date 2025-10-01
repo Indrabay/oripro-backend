@@ -1,9 +1,10 @@
 const { Op, where } = require("sequelize");
 
 class AssetRepository {
-  constructor(assetModel, assetAdminModel) {
+  constructor(assetModel, assetAdminModel, userModel) {
     this.assetModel = assetModel;
     this.assetAdminModel = assetAdminModel;
+    this.userModel = userModel;
   }
 
   async create(
@@ -18,7 +19,7 @@ class AssetRepository {
       longitude,
       latitude,
       is_deleted,
-      createdBy,
+      created_by,
     },
     ctx = {},
     t = null
@@ -37,7 +38,7 @@ class AssetRepository {
           longitude,
           latitude,
           is_deleted,
-          created_by: createdBy,
+          created_by,
         },
         { transaction: t }
       );
@@ -117,9 +118,30 @@ class AssetRepository {
       whereQuery.order = order;
     }
 
-    console.log(whereQuery);
-    const assets = await this.assetModel.findAll(whereQuery);
-    return assets.map((a) => a.toJSON());
+    whereQuery.include = [
+      {
+        model: this.userModel,
+        as: 'createdBy',
+        attributes: ['id', 'name', 'email'],
+      },
+      {
+        model: this.userModel,
+        as: 'updatedBy',
+        attributes: ['id', 'name', 'email'],
+      },
+    ]
+
+    const assets = await this.assetModel.findAndCountAll(whereQuery
+    );
+    return {
+      assets: assets.rows.map((a) => {
+        const { createdBy, updatedBy, ...asset } = a.toJSON();
+        asset.created_by = createdBy;
+        asset.updated_by = updatedBy;
+        return asset;
+      }),
+      total: assets.count,
+    };
   }
 
   async listForAdmin(userId, queryParams = {}, ctx = {}) {

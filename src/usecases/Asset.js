@@ -1,5 +1,7 @@
 const sequelize = require("../models/sequelize");
 const { AttachmentType } = require("../models/AssetAttachment");
+const moment = require("moment");
+const PrefixAsset = "ASSET";
 
 class AssetUsecase {
   constructor(assetRepository, assetLogRepository, assetAttachmentRepository) {
@@ -7,21 +9,22 @@ class AssetUsecase {
     this.assetLogRepository = assetLogRepository;
     this.assetAttachmentRepository = assetAttachmentRepository;
   }
+
   async createAsset(data, ctx) {
     try {
       const result = await sequelize.transaction(async (t) => {
         const createAssetData = {
           name: data.name,
-          code: data.code,
           description: data.description,
           asset_type: data.asset_type,
           status: data.status,
+          code: this.generateCode(),
           is_deleted: data.is_deleted,
           address: data.address,
           area: data.area,
           latitude: data.latitude,
           longitude: data.longitude,
-          created_by: data.createdBy,
+          created_by: ctx.userID,
         };
         const asset = await this.assetRepository.create(
           createAssetData,
@@ -59,6 +62,10 @@ class AssetUsecase {
     }
   }
 
+  generateCode() {
+    return `${PrefixAsset}-${moment().local().format('DDMMYYYYHHmmss')}`
+  }
+
   async createAttachment(assetId, data, type, trx) {
     for (let i = 0; i < data.length; i++) {
       const attachmentData = {
@@ -74,6 +81,7 @@ class AssetUsecase {
   async listAssets(queryParams, ctx) {
     if (ctx.roleName === "super_admin") {
       return await this.assetRepository.listAll(queryParams, ctx);
+
     }
     return await this.assetRepository.listForAdmin(ctx.userId, queryParams, ctx);
   }

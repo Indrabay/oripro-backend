@@ -1,6 +1,7 @@
 const { Router } = require("express");
 const { body, validationResult, param } = require("express-validator");
 const { authMiddleware, ensureRole } = require("../middleware/auth");
+const { createResponse } = require("../services/response");
 
 function InitAssetRouter(AssetUsecase) {
   const router = Router();
@@ -12,7 +13,6 @@ function InitAssetRouter(AssetUsecase) {
     [
       body("name").isString().notEmpty(),
       body("asset_type").isInt().notEmpty(),
-      body("code").isString().notEmpty(),
       body("address").isString().notEmpty(),
       body("area").isFloat().notEmpty(),
       body("status").optional().isInt(),
@@ -26,7 +26,10 @@ function InitAssetRouter(AssetUsecase) {
   );
 
   router.get("/", async (req, res) => {
-    const { name, asset_type, order, limit, offset } = req.query;
+    let { name, asset_type, order, limit, offset } = req.query;
+    if (!limit) limit = 10;
+    if (!offset) offset = 0;
+
     req.log?.info({}, "route_assets_list");
     const assets = await AssetUsecase.listAssets({
       name,
@@ -40,7 +43,7 @@ function InitAssetRouter(AssetUsecase) {
       roleName: req.auth.roleName,
       userId: req.auth.userId,
     });
-    return res.json(assets);
+    return res.status(200).json(createResponse(assets.assets, "Assets fetched successfully", 200, true, { total: assets.total, limit: limit, offset: offset }));
   });
 
   router.get("/:id", [param("id").isString().notEmpty()], getDetailAsset);
@@ -80,7 +83,6 @@ function InitAssetRouter(AssetUsecase) {
     const {
       name,
       asset_type,
-      code,
       address,
       area,
       status,
@@ -96,7 +98,6 @@ function InitAssetRouter(AssetUsecase) {
         name,
         description,
         asset_type,
-        code,
         address,
         area,
         status: status ? status : 1,
@@ -114,68 +115,9 @@ function InitAssetRouter(AssetUsecase) {
         userID: req.auth.userId,
       }
     );
-    return res.status(201).json(asset);
+    return res.status(201).json(createResponse(asset, "Asset created successfully", 201));
   }
 
-  router.get('/', async (req, res) => {
-    req.log?.info({}, 'route_assets_list');
-    try {
-      const assets = await AssetUsecase.listAssets({ requestId: req.requestId, log: req.log, roleName: req.auth.roleName, userId: req.auth.userId });
-      return res.json(assets);
-    } catch (error) {
-      req.log?.error({ error: error.message, stack: error.stack }, 'route_assets_list_error');
-      
-      return res.status(500).json({ 
-        message: 'Internal Server Error',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
-    }
-  });
-
-  router.get(
-    '/:id',
-    [param('id').isString().notEmpty()],
-    async (req, res) => {
-      req.log?.info({ id: req.params.id }, 'route_assets_get');
-      const asset = await AssetUsecase.getAsset(req.params.id, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName, userId: req.auth.userId });
-      if (!asset) return res.status(404).json({ message: 'Not found' });
-      if (asset === 'forbidden') return res.status(403).json({ message: 'Forbidden' });
-      return res.json(asset);
-    }
-  );
-
-  router.put(
-    '/:id',
-    [
-      param('id').isString().notEmpty(),
-      body('name').optional().isString(),
-      body('address').optional().isString(),
-      body('description').optional().isString(),
-      body('area').optional().isFloat(),
-      body('status').optional().isInt(),
-      body('aset_type').optional().isInt(),
-      body('longitude').optional().isFloat({ min: -180, max: 180 }),
-      body('latitude').optional().isFloat({ min: -90, max: 90 })
-    ],
-    async (req, res) => {
-      req.log?.info({ id: req.params.id }, 'route_assets_update');
-      const updated = await AssetUsecase.updateAsset(req.params.id, req.body, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName, userId: req.auth.userId });
-      if (!updated) return res.status(404).json({ message: 'Not found' });
-      if (updated === 'forbidden') return res.status(403).json({ message: 'Forbidden' });
-      return res.json(updated);
-    }
-  );
-
-  router.delete(
-    '/:id',
-    [param('id').isString().notEmpty()],
-    async (req, res) => {
-      req.log?.info({ id: req.params.id }, 'route_assets_delete');
-      const deleted = await AssetUsecase.deleteAsset(req.params.id, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName, userId: req.auth.userId });
-      if (!deleted) return res.status(404).json({ message: 'Not found' });
-      return res.status(204).send();
-    }
-  );
   async function getDetailAsset(req, res) {
     req.log?.info({ id: req.params.id }, "route_assets_get");
     const asset = await AssetUsecase.getAsset(req.params.id, {
@@ -187,7 +129,7 @@ function InitAssetRouter(AssetUsecase) {
     if (!asset) return res.status(404).json({ message: "Not found" });
     if (asset === "forbidden")
       return res.status(403).json({ message: "Forbidden" });
-    return res.json(asset);
+    return res.status(200).json(createResponse(asset, "Asset fetched successfully", 200)) ;
   }
 
   return router;

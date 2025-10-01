@@ -44,6 +44,10 @@ Tenant.init({
     type: DataTypes.INTEGER,
     allowNull: false,
   },
+  status: {
+    type: DataTypes.INTEGER,
+    defaultValue: 1,
+  },
   code: {
     type: DataTypes.STRING,
     allowNull: false,

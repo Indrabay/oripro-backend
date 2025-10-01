@@ -20,7 +20,10 @@ User.init({
   },
   name: DataTypes.STRING,
   role_id: DataTypes.INTEGER,
-  status: DataTypes.STRING,
+  status: {
+    type: DataTypes.INTEGER,
+    defaultValue: 1,
+  },
   created_by: DataTypes.UUID,
   updated_by: DataTypes.UUID,
   created_at: {
