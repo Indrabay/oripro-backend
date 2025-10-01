@@ -69,8 +69,27 @@ class AssetRepository {
 
   async findById(id, ctx = {}) {
     ctx.log?.debug({ id }, "repo_assets_find_by_id");
-    const asset = await this.assetModel.findByPk(id);
-    return asset ? asset.toJSON() : null;
+    const asset = await this.assetModel.findByPk(id, {
+      include: [
+        {
+          model: this.userModel,
+          as: 'createdBy',
+          attributes: ['id', 'name', 'email'],
+        },
+        {
+          model: this.userModel,
+          as: 'updatedBy',
+          attributes: ['id', 'name', 'email'],
+        },
+      ],
+    });
+
+    const result = asset ? asset.toJSON() : null;
+    result.created_by = result.createdBy;
+    result.updated_by = result.updatedBy;
+    delete result.createdBy;
+    delete result.updatedBy;
+    return result;
   }
 
   async listAll(queryParams, ctx = {}) {

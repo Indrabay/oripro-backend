@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const { body, validationResult, param } = require('express-validator');
 const { authMiddleware, ensureRole } = require('../middleware/auth');
+const { createResponse } = require('../services/response');
 
 function InitUnitRouter(UnitUsecase) {
   const router = Router();
@@ -41,15 +42,18 @@ function InitUnitRouter(UnitUsecase) {
         photos,
         createdBy: req.auth.userId
       }, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName, userId: req.auth.userId });
-      return res.status(201).json(unit);
+      return res.status(201).json(createResponse(unit, 'Unit created successfully', 201));
     }
   );
 
   router.get('/', async (req, res) => {
     req.log?.info({}, 'route_units_list');
+    let { offset, limit } = req.query;
+    if (!offset) offset = 0;
+    if (!limit) limit = 10;
     try {
       const units = await UnitUsecase.getAllUnits({ requestId: req.requestId, log: req.log, roleName: req.auth.roleName, userId: req.auth.userId });
-      return res.json(units);
+      return res.status(200).json(createResponse(units.units, 'Units fetched successfully', 200, true,{ total: units.total, offset: offset, limit: limit }));
     } catch (error) {
       req.log?.error({ error: error.message, stack: error.stack }, 'route_units_list_error');
       
@@ -70,10 +74,10 @@ function InitUnitRouter(UnitUsecase) {
       try {
         const unit = await UnitUsecase.getUnitById(req.params.id, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName });
         if (!unit) return res.status(404).json({ message: 'Unit not found' });
-        return res.json(unit);
+        return res.status(200).json(createResponse(unit, 'Unit fetched successfully', 200));
       } catch (error) {
         req.log?.error({ error: error.message }, 'route_units_get_error');
-        return res.status(500).json({ message: 'Internal Server Error' });
+        return res.status(500).json(createResponse(null, 'Internal Server Error', 500));
       }
     }
   );
@@ -114,25 +118,7 @@ function InitUnitRouter(UnitUsecase) {
         return res.json(unit);
       } catch (error) {
         req.log?.error({ error: error.message }, 'route_units_update_error');
-        return res.status(500).json({ message: 'Internal Server Error' });
-      }
-    }
-  );
-
-  router.delete(
-    '/:id',
-    [param('id').isString().notEmpty()],
-    async (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-      req.log?.info({ id: req.params.id }, 'route_units_delete');
-      try {
-        const success = await UnitUsecase.deleteUnit(req.params.id, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName });
-        if (!success) return res.status(404).json({ message: 'Unit not found' });
-        return res.status(204).send();
-      } catch (error) {
-        req.log?.error({ error: error.message }, 'route_units_delete_error');
-        return res.status(500).json({ message: 'Internal Server Error' });
+        return res.status(500).json(createResponse(null, 'Internal Server Error', 500));
       }
     }
   );

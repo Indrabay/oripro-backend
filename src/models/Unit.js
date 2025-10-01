@@ -78,4 +78,19 @@ Unit.init(
   }
 );
 
+Unit.associate = (models) => {
+  Unit.belongsTo(models.User, {
+    foreignKey: 'created_by',
+    as: 'createdBy',
+  });
+  Unit.belongsTo(models.User, {
+    foreignKey: 'updated_by',
+    as: 'updatedBy',
+  });
+  Unit.belongsTo(models.Asset, {
+    foreignKey: 'asset_id',
+    as: 'asset',
+  });
+};
+
 module.exports = Unit;
