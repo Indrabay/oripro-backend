@@ -189,7 +189,40 @@ class UserRepository {
 
     return permissions;
   }
+
+  async getUserSidebar(userId, ctx = {}) {
+    ctx.log?.info({ userId }, 'repo_get_user_sidebar');
+    const user = await this.userModel.findByPk(userId, {
+      include: [{
+        model: this.userModel.sequelize.models.Role,
+        as: 'role',
+        include: [{
+          model: this.userModel.sequelize.models.RoleMenuPermission,
+          as: 'menuPermissions',
+        }]
+      }]
+    });
+
+    if (!user || !user.role) {
+      return [];
+    }
+  
+    // Extract permissions from role
+    const permissions = user.role.menuPermissions?.map(perm => ({
+      menu_id: perm.menu.id,
+      can_view: perm.can_view,
+      can_create: perm.can_create,
+      can_update: perm.can_update,
+      can_delete: perm.can_delete,
+      can_confirm: perm.can_confirm
+    })) || [];
+  
+    return permissions;
+  }
+  
 }
+
+  
 
 module.exports = UserRepository;
 

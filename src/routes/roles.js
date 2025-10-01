@@ -64,7 +64,7 @@ function InitRoleRouter(roleUsecase) {
   router.put(
     '/:id',
     [
-      param('id').isUUID().withMessage('Invalid role ID'),
+      param('id').isInt({ min: 1 }).withMessage('Invalid role ID'),
       body('name').optional().isString().notEmpty().withMessage('Name cannot be empty'),
       body('level').optional().isInt({ min: 0 }).withMessage('Level must be a non-negative integer'),
       body('menuPermissions').optional().isArray().withMessage('Menu permissions must be an array'),
@@ -91,7 +91,7 @@ function InitRoleRouter(roleUsecase) {
   router.delete(
     '/:id',
     [
-      param('id').isUUID().withMessage('Invalid role ID'),
+      param('id').isInt({ min: 1 }).withMessage('Invalid role ID'),
     ],
     async (req, res) => {
       const errors = validationResult(req);
@@ -115,7 +115,7 @@ function InitRoleRouter(roleUsecase) {
   router.get(
     '/:id/menu-permissions',
     [
-      param('id').isUUID().withMessage('Invalid role ID'),
+      param('id').isInt({ min: 1 }).withMessage('Invalid role ID'),
     ],
     async (req, res) => {
       const errors = validationResult(req);
@@ -138,7 +138,7 @@ function InitRoleRouter(roleUsecase) {
   router.put(
     '/:id/menu-permissions',
     [
-      param('id').isUUID().withMessage('Invalid role ID'),
+      param('id').isInt({ min: 1 }).withMessage('Invalid role ID'),
       body('permissions').isArray().withMessage('Permissions must be an array'),
     ],
     async (req, res) => {

@@ -35,6 +35,7 @@ const MenuRepository = require('./repositories/Menu');
 const AssetAttachmentRepository = require('./repositories/AssetAttachment');
 const UnitAttachmentRepository = require('./repositories/UnitAttachment');
 const TenantCategoryRepository = require('./repositories/TenantCategory');
+const UserAccessMenuRepository = require('./repositories/UserAccessMenu');
 
 // define usecase module
 const authUc = require('./usecases/Auth');
@@ -44,6 +45,7 @@ const unitUc = require('./usecases/Unit');
 const tenantUc = require('./usecases/Tenant');
 const roleUc = require('./usecases/Role');
 const menuUc = require('./usecases/Menu');
+const userAccessMenuUc = require('./usecases/UserAccessMenu');
 
 // define models database
 const modelUser = require('./models/User');
@@ -78,6 +80,34 @@ const menuRepository = new MenuRepository(modelMenu)
 const assetAttachmentRepository = new AssetAttachmentRepository(AssetAttachment);
 const unitAttachmentRepository = new UnitAttachmentRepository(modelUnitAttachment);
 const tenantCategoryRepository = new TenantCategoryRepository(modelTenantCategory);
+const userAccessMenuRepository = new UserAccessMenuRepository(modelUser, modelRole, modelRoleMenuPermission, modelMenu);
+
+// Setup model associations
+const models = {
+  User: modelUser,
+  Role: modelRole,
+  Menu: modelMenu,
+  RoleMenuPermission: modelRoleMenuPermission,
+  Asset: Asset,
+  AssetLog: modelAssetLog,
+  Unit: modelUnit,
+  AssetAdmin: modelAdminAsset,
+  PasswordResetToken: modelPasswordResetToken,
+  Tenant: Tenant,
+  TenantAttachment: TenantAttachmentModel,
+  MapTenantCategory: MapTenantCategory,
+  TenantUnit: modelTenantUnit,
+  AssetAttachment: AssetAttachment,
+  UnitAttachment: modelUnitAttachment,
+  TenantCategory: modelTenantCategory
+};
+
+// Setup associations
+Object.keys(models).forEach(modelName => {
+  if (models[modelName].associate) {
+    models[modelName].associate(models);
+  }
+});
 
 // initialize usecase
 const assetUsecase = new assetUc(assetRepository, assetLogRepository, assetAttachmentRepository);
@@ -94,11 +124,12 @@ const unitUsecase = new unitUc(unitRepository, unitAttachmentRepository);
 const tenantUsecase = new tenantUc(tenantRepository, tenantAttachmentRepository, tenantUnitRepository, mapTenantCategoryRepository, tenantCategoryRepository, unitRepository);
 const roleUsecase = new roleUc(roleRepository);
 const menuUsecase = new menuUc(menuRepository);
+const userAccessMenuUsecase = new userAccessMenuUc(userAccessMenuRepository);
 
 // initalize router
 const authRouter = auth.InitAuthRouter(authUsecase);
 const assetRouter = asset.InitAssetRouter(assetUsecase);
-const userRouter = user.InitUserRouter(userUsecase);
+const userRouter = user.InitUserRouter(userUsecase, userAccessMenuUsecase);
 const unitRouter = units.InitUnitRouter(unitUsecase);
 const tenantRouter = tenant.InitTenantRouter(tenantUsecase);
 const roleRouter = InitRoleRouter(roleUsecase);

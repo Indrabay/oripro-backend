@@ -4,8 +4,8 @@ module.exports = {
   up: async (queryInterface, Sequelize) => {
     await queryInterface.createTable('menus', {
       id: {
-        type: Sequelize.UUID,
-        defaultValue: Sequelize.UUIDV4,
+        type: Sequelize.INTEGER,
+        autoIncrement: true,
         primaryKey: true,
         allowNull: false,
       },
@@ -22,7 +22,7 @@ module.exports = {
         allowNull: true,
       },
       parent_id: {
-        type: Sequelize.UUID,
+        type: Sequelize.INTEGER,
         allowNull: true,
         references: {
           model: 'menus',
@@ -52,11 +52,11 @@ module.exports = {
         defaultValue: Sequelize.NOW,
       },
       created_by: {
-        type: Sequelize.UUID,
+        type: Sequelize.INTEGER,
         allowNull: true,
       },
       updated_by: {
-        type: Sequelize.UUID,
+        type: Sequelize.INTEGER,
         allowNull: true,
       },
     });

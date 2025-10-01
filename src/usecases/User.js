@@ -73,6 +73,18 @@ class UserUsecase {
     const permissions = await this.userRepository.getUserPermissions(userId, ctx);
     return permissions;
   }
+
+  async getUserMenus(userId, ctx) {
+    ctx.log?.info({ userId }, 'usecase_get_user_menus');
+    const menus = await this.userRepository.getUserMenus(userId, ctx);
+    return menus;
+  }
+
+  async getUserSidebar(userId, ctx) {
+    ctx.log?.info({ userId }, 'usecase_get_user_sidebar');
+    const sidebar = await this.userRepository.getUserSidebar(userId, ctx);
+    return sidebar;
+  }
 }
 
 module.exports = UserUsecase;

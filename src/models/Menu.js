@@ -5,8 +5,8 @@ class Menu extends Model {}
 
 Menu.init({
   id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
+    type: DataTypes.INTEGER,
+    autoIncrement: true,
     primaryKey: true,
   },
   title: {
@@ -22,7 +22,7 @@ Menu.init({
     allowNull: true,
   },
   parent_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: true,
     references: {
       model: 'menus',

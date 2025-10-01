@@ -19,6 +19,11 @@ async function run() {
     console.log('3. Seeding admin users...');
     execSync('npm run seed:admin', { stdio: 'inherit' });
     console.log('✅ Admin users seeded successfully\n');
+
+    // Seed menus
+    console.log('4. Seeding menus...');
+    execSync('npm run seed:menus', { stdio: 'inherit' });
+    console.log('✅ Menus seeded successfully\n');
     
     console.log('🎉 All seeding completed successfully!');
     console.log('\n📋 Available users:');

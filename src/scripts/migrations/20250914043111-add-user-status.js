@@ -2,6 +2,13 @@
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
+    // Check if table exists first
+    const tables = await queryInterface.showAllTables();
+    if (!tables.includes('users')) {
+      console.log('Users table does not exist, skipping status column addition');
+      return;
+    }
+    
     // Check if status column already exists before adding it
     const tableDescription = await queryInterface.describeTable('users');
     
