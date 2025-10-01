@@ -9,7 +9,7 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 const env = process.env.NODE_ENV || 'postgres';
-const config = require(__dirname + '/../config/config.json')[env];
+const config = require(__dirname + '/../../config/config.json')[env];
 const db = {};
 
 console.log('config', config)
@@ -27,7 +27,7 @@ fs
     );
   })
   .forEach(file => {
-    const model = require(path.join(__dirname, file))(sequelize, Sequelize.DataTypes);
+    const model = require(path.join(__dirname, file));
     db[model.name] = model;
   });
 

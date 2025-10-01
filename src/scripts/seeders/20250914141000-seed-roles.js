@@ -1,22 +1,21 @@
 // Seeder for roles
 'use strict';
-const { v4: uuidv4 } = require('uuid');
 
 module.exports = {
   up: async (queryInterface) => {
     await queryInterface.bulkInsert('roles', [
       {
-        id: uuidv4(),
+        id: 1,
         name: 'super_admin',
         level: 100,
       },
       {
-        id: uuidv4(),
+        id: 2,
         name: 'admin',
         level: 50,
       },
       {
-        id: uuidv4(),
+        id: 3,
         name: 'user',
         level: 1,
       },

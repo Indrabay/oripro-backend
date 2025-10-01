@@ -11,6 +11,7 @@
     "seed": "node --env_file=./.env -r dotenv/config scripts/seedDemoUser.js",
     "seed:roles": "node --env_file=./.env -r dotenv/config scripts/seedRoles.js",
     "seed:admin": "node --env_file=./.env -r dotenv/config scripts/seedAdminUser.js",
+    "seed:menus": "node --env_file=./.env -r dotenv/config scripts/seedMenus.js",
     "seed:all": "node --env_file=./.env -r dotenv/config scripts/seedAll.js",
     "test": "jest",
     "test:coverage": "jest --coverage"
@@ -31,6 +32,7 @@
     "morgan": "^1.10.0",
     "multer": "^2.0.2",
     "mysql2": "^3.14.5",
+    "node-fetch": "^3.3.2",
     "nodemailer": "^6.9.14",
     "pg": "^8.16.3",
     "postgres": "^3.4.7",

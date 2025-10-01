@@ -19,7 +19,8 @@ User.init({
     allowNull: false,
   },
   name: DataTypes.STRING,
-  role_id: DataTypes.UUID,
+  role_id: DataTypes.INTEGER,
+  status: DataTypes.STRING,
   created_by: DataTypes.UUID,
   updated_by: DataTypes.UUID,
   created_at: {
@@ -36,5 +37,13 @@ User.init({
   tableName: 'users',
   timestamps: false,
 });
+
+// Define associations
+User.associate = (models) => {
+  User.belongsTo(models.Role, {
+    as: 'role',
+    foreignKey: 'role_id',
+  });
+};
 
 module.exports = User;

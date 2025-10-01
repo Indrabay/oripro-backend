@@ -2,7 +2,7 @@ const { Router } = require('express');
 const { body, validationResult, param } = require('express-validator');
 const { authMiddleware, ensureRole } = require('../middleware/auth');
 
-function InitUserRouter(userUsecase) {
+function InitUserRouter(userUsecase, userAccessMenuUsecase) {
   const router = Router();
   router.use(authMiddleware, ensureRole);
 
@@ -14,7 +14,47 @@ function InitUserRouter(userUsecase) {
       if (users === 'forbidden') return res.status(403).json({ message: 'Admin cannot list all users' });
       return res.json(users);
     } catch (error) {
-      req.log?.error({ error: error.message }, 'route_users_list_error');
+      req.log?.error({ error: error.message, stack: error.stack }, 'route_users_list_error');
+      
+      return res.status(500).json({ 
+        message: 'Internal Server Error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  });
+
+  // GET /api/users/permissions - Get current user permissions
+  router.get('/permissions', async (req, res) => {
+    req.log?.info({ userId: req.auth.userId }, 'route_users_permissions');
+    try {
+      const permissions = await userUsecase.getUserPermissions(req.auth.userId, { requestId: req.requestId, log: req.log });
+      return res.json({ permissions });
+    } catch (error) {
+      req.log?.error({ error: error.message }, 'route_users_permissions_error');
+      return res.status(500).json({ message: 'Internal Server Error' });
+    }
+  });
+
+  // GET /api/users/menus - Get user accessible menus
+  router.get('/menus', async (req, res) => {
+    req.log?.info({ userId: req.auth.userId }, 'route_users_menus');
+    try {
+      const menus = await userAccessMenuUsecase.getUserAccessibleMenus(req.auth.userId, { requestId: req.requestId, log: req.log });
+      return res.json({ menus });
+    } catch (error) {
+      req.log?.error({ error: error.message }, 'route_users_menus_error');
+      return res.status(500).json({ message: 'Internal Server Error' });
+    }
+  });
+
+  // GET /api/users/sidebar - Get user accessible sidebar
+  router.get('/sidebar', async (req, res) => {
+    req.log?.info({ userId: req.auth.userId }, 'route_users_sidebar');
+    try {
+      const sidebar = await userAccessMenuUsecase.getUserSidebarData(req.auth.userId, { requestId: req.requestId, log: req.log });
+      return res.json(sidebar);
+    } catch (error) {
+      req.log?.error({ error: error.message }, 'route_users_sidebar_error');
       return res.status(500).json({ message: 'Internal Server Error' });
     }
   });
@@ -45,6 +85,7 @@ function InitUserRouter(userUsecase) {
       body('email').isEmail().normalizeEmail(),
       body('password').isLength({ min: 6 }),
       body('name').optional().isString().notEmpty(),
+      body('status').optional().isIn(['active', 'inactive', 'pending', 'suspended']),
       body('roleId').optional().isString().notEmpty()
     ],
     async (req, res) => {
@@ -69,6 +110,7 @@ function InitUserRouter(userUsecase) {
       param('id').isString().notEmpty(),
       body('email').optional().isEmail().normalizeEmail(),
       body('name').optional().isString().notEmpty(),
+      body('status').optional().isIn(['active', 'inactive', 'pending', 'suspended']),
       body('roleId').optional().isString().notEmpty()
     ],
     async (req, res) => {

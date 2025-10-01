@@ -15,6 +15,7 @@ const units = require('./routes/units');
 const tenant = require('./routes/tenants');
 const uploadsRouter = require('./routes/uploads');
 const { InitRoleRouter } = require('./routes/roles');
+const { InitMenuRouter } = require('./routes/menus');
 const { requestContext } = require('./middleware/requestContext');
 const { metricsMiddleware, metricsHandler } = require('./services/metrics');
 
@@ -30,9 +31,11 @@ const TenantRepository = require('./repositories/Tenant');
 const TenantAttachmentRepository = require('./repositories/TenantAttachment');
 const MapTenantCategoryRepository = require('./repositories/MapTenantCategory');
 const TenantUnitRepository = require('./repositories/TenantUnit');
+const MenuRepository = require('./repositories/Menu');
 const AssetAttachmentRepository = require('./repositories/AssetAttachment');
 const UnitAttachmentRepository = require('./repositories/UnitAttachment');
 const TenantCategoryRepository = require('./repositories/TenantCategory');
+const UserAccessMenuRepository = require('./repositories/UserAccessMenu');
 
 // define usecase module
 const authUc = require('./usecases/Auth');
@@ -41,6 +44,8 @@ const userUc = require('./usecases/User');
 const unitUc = require('./usecases/Unit');
 const tenantUc = require('./usecases/Tenant');
 const roleUc = require('./usecases/Role');
+const menuUc = require('./usecases/Menu');
+const userAccessMenuUc = require('./usecases/UserAccessMenu');
 
 // define models database
 const modelUser = require('./models/User');
@@ -54,6 +59,8 @@ const { Tenant } = require('./models/Tenant');
 const {TenantAttachmentModel} = require('./models/TenantAttachment');
 const MapTenantCategory = require('./models/MapTenantCategory');
 const modelTenantUnit = require('./models/TenantUnit');
+const modelMenu = require('./models/Menu');
+const modelRoleMenuPermission = require('./models/RoleMenuPermission');
 const { AssetAttachment } = require('./models/AssetAttachment');
 const modelUnitAttachment = require('./models/UnitAttachment');
 const modelTenantCategory = require('./models/TenantCategory');
@@ -64,14 +71,43 @@ const tokenRepository = new PasswordResetTokenRepository(modelPasswordResetToken
 const assetRepository = new AssetRepository(Asset, modelAdminAsset);
 const assetLogRepository = new AssetLogRepository(modelAssetLog);
 const unitRepository = new UnitRepository(modelUnit);
-const roleRepository = new RoleRepository(modelRole);
+const roleRepository = new RoleRepository(modelRole, modelRoleMenuPermission);
 const tenantRepository = new TenantRepository(Tenant);
 const tenantAttachmentRepository = new TenantAttachmentRepository(TenantAttachmentModel)
 const mapTenantCategoryRepository = new MapTenantCategoryRepository(MapTenantCategory)
 const tenantUnitRepository = new TenantUnitRepository(modelTenantUnit)
+const menuRepository = new MenuRepository(modelMenu)
 const assetAttachmentRepository = new AssetAttachmentRepository(AssetAttachment);
 const unitAttachmentRepository = new UnitAttachmentRepository(modelUnitAttachment);
 const tenantCategoryRepository = new TenantCategoryRepository(modelTenantCategory);
+const userAccessMenuRepository = new UserAccessMenuRepository(modelUser, modelRole, modelRoleMenuPermission, modelMenu);
+
+// Setup model associations
+const models = {
+  User: modelUser,
+  Role: modelRole,
+  Menu: modelMenu,
+  RoleMenuPermission: modelRoleMenuPermission,
+  Asset: Asset,
+  AssetLog: modelAssetLog,
+  Unit: modelUnit,
+  AssetAdmin: modelAdminAsset,
+  PasswordResetToken: modelPasswordResetToken,
+  Tenant: Tenant,
+  TenantAttachment: TenantAttachmentModel,
+  MapTenantCategory: MapTenantCategory,
+  TenantUnit: modelTenantUnit,
+  AssetAttachment: AssetAttachment,
+  UnitAttachment: modelUnitAttachment,
+  TenantCategory: modelTenantCategory
+};
+
+// Setup associations
+Object.keys(models).forEach(modelName => {
+  if (models[modelName].associate) {
+    models[modelName].associate(models);
+  }
+});
 
 // initialize usecase
 const assetUsecase = new assetUc(assetRepository, assetLogRepository, assetAttachmentRepository);
@@ -87,14 +123,17 @@ const userUsecase = new userUc(userRepository);
 const unitUsecase = new unitUc(unitRepository, unitAttachmentRepository);
 const tenantUsecase = new tenantUc(tenantRepository, tenantAttachmentRepository, tenantUnitRepository, mapTenantCategoryRepository, tenantCategoryRepository, unitRepository);
 const roleUsecase = new roleUc(roleRepository);
+const menuUsecase = new menuUc(menuRepository);
+const userAccessMenuUsecase = new userAccessMenuUc(userAccessMenuRepository);
 
 // initalize router
 const authRouter = auth.InitAuthRouter(authUsecase);
 const assetRouter = asset.InitAssetRouter(assetUsecase);
-const userRouter = user.InitUserRouter(userUsecase);
+const userRouter = user.InitUserRouter(userUsecase, userAccessMenuUsecase);
 const unitRouter = units.InitUnitRouter(unitUsecase);
 const tenantRouter = tenant.InitTenantRouter(tenantUsecase);
 const roleRouter = InitRoleRouter(roleUsecase);
+const menuRouter = InitMenuRouter(menuUsecase);
 const uploadFileRouter = uploadsRouter.InitUploadRouter();
 
 // Middleware
@@ -139,6 +178,7 @@ app.use('/api/users', userRouter);
 app.use('/api/units', unitRouter);
 app.use('/api/tenants', tenantRouter);
 app.use('/api/roles', roleRouter);
+app.use('/api/menus', menuRouter);
 app.use('/api/uploads', uploadFileRouter);
 app.get('/metrics', metricsHandler);
 

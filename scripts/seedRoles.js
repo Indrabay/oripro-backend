@@ -4,11 +4,15 @@ const Role = require('../src/models/Role');
 async function run(sequelize) {
   await sequelize.authenticate();
   await sequelize.sync();
-  const roles = ['user', 'admin', 'super_admin'];
+  const roles = [
+    { name: 'user', level: 1 },
+    { name: 'admin', level: 50 },
+    { name: 'super_admin', level: 100 }
+  ];
 
-  for (const roleName of roles) {
-    await Role.upsert({ name: roleName });
-    console.log(`Role '${roleName}' created/updated`);
+  for (const role of roles) {
+    await Role.upsert({ name: role.name, level: role.level });
+    console.log(`Role '${role.name}' created/updated with level ${role.level}`);
   }
 
   console.log('All roles seeded successfully');
