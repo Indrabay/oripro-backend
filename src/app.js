@@ -48,7 +48,7 @@ const menuUc = require('./usecases/Menu');
 const userAccessMenuUc = require('./usecases/UserAccessMenu');
 
 // define models database
-const modelUser = require('./models/User');
+const {User} = require('./models/User');
 const modelRole = require('./models/Role');
 const {Asset} = require('./models/Asset');
 const modelAssetLog = require('./models/AssetLog');
@@ -66,11 +66,11 @@ const modelUnitAttachment = require('./models/UnitAttachment');
 const modelTenantCategory = require('./models/TenantCategory');
 
 // initialize repository
-const userRepository = new UserRepository(modelUser, modelRole);
+const userRepository = new UserRepository(User, modelRole);
 const tokenRepository = new PasswordResetTokenRepository(modelPasswordResetToken);
-const assetRepository = new AssetRepository(Asset, modelAdminAsset, modelUser);
+const assetRepository = new AssetRepository(Asset, modelAdminAsset, User);
 const assetLogRepository = new AssetLogRepository(modelAssetLog);
-const unitRepository = new UnitRepository(modelUnit, Asset, modelUser);
+const unitRepository = new UnitRepository(modelUnit, Asset, User);
 const roleRepository = new RoleRepository(modelRole, modelRoleMenuPermission);
 const tenantRepository = new TenantRepository(Tenant);
 const tenantAttachmentRepository = new TenantAttachmentRepository(TenantAttachmentModel)
@@ -80,11 +80,11 @@ const menuRepository = new MenuRepository(modelMenu)
 const assetAttachmentRepository = new AssetAttachmentRepository(AssetAttachment);
 const unitAttachmentRepository = new UnitAttachmentRepository(modelUnitAttachment);
 const tenantCategoryRepository = new TenantCategoryRepository(modelTenantCategory);
-const userAccessMenuRepository = new UserAccessMenuRepository(modelUser, modelRole, modelRoleMenuPermission, modelMenu);
+const userAccessMenuRepository = new UserAccessMenuRepository(User, modelRole, modelRoleMenuPermission, modelMenu);
 
 // Setup model associations
 const models = {
-  User: modelUser,
+  User: User,
   Role: modelRole,
   Menu: modelMenu,
   RoleMenuPermission: modelRoleMenuPermission,

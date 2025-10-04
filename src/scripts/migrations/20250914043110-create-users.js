@@ -14,6 +14,14 @@ module.exports = {
         allowNull: false,
         unique: true,
       },
+      phone: {
+        type: Sequelize.STRING,
+        allowNull: false,
+      },
+      gender: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+      },
       password: {
         type: Sequelize.TEXT,
         allowNull: false,

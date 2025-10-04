@@ -3,6 +3,16 @@ const sequelize = require('./sequelize');
 
 class User extends Model {}
 
+const UserGenderStrToInt = {
+  'male': 1,
+  'female': 2
+}
+
+const UserGenderIntToStr = {
+  1: 'male',
+  2: 'female'
+}
+
 User.init({
   id: {
     type: DataTypes.UUID,
@@ -13,6 +23,14 @@ User.init({
     type: DataTypes.STRING(320),
     allowNull: false,
     unique: true,
+  },
+  gender: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
+  phone: {
+    type: DataTypes.STRING,
+    allowNull: false
   },
   password: {
     type: DataTypes.TEXT,
@@ -49,4 +67,4 @@ User.associate = (models) => {
   });
 };
 
-module.exports = User;
+module.exports = { User, UserGenderStrToInt, UserGenderIntToStr };

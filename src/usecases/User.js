@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const { UserGenderStrToInt, UserGenderIntToStr } = require('../models/User');
 
 class UserUsecase {
   constructor(userRepository) {
@@ -10,6 +11,7 @@ class UserUsecase {
       const users = await this.userRepository.listAll(ctx);
       return users.map(user => {
         const { password, ...userWithoutPassword } = user;
+        userWithoutPassword.gender = UserGenderIntToStr[userWithoutPassword.gender]
         return userWithoutPassword;
       });
     }
@@ -21,6 +23,7 @@ class UserUsecase {
     if (!user) return null;
     // Add admin logic if needed
     const { password, ...userWithoutPassword } = user;
+    userWithoutPassword.gender = UserGenderIntToStr[userWithoutPassword.gender]
     return userWithoutPassword;
   }
 
@@ -30,6 +33,8 @@ class UserUsecase {
     
     // Hash password before saving
     const hashedPassword = await bcrypt.hash(data.password, 10);
+
+    data.gender = UserGenderStrToInt[data.gender]
     
     const user = await this.userRepository.create({
       ...data,
@@ -46,6 +51,10 @@ class UserUsecase {
     if (data.email && data.email !== user.email) {
       const existingUser = await this.userRepository.findByEmail(data.email, ctx);
       if (existingUser) return 'exists';
+    }
+
+    if (data.gender) {
+      data.gender = UserGenderStrToInt[data.gender]
     }
     
     // Hash password if it's being updated

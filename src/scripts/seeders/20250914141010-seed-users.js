@@ -21,6 +21,8 @@ module.exports = {
         email: 'superadmin@example.com',
         password: await bcrypt.hash('superadmin', 10),
         name: 'Super Admin',
+        gender: 1,
+        phone: '08181818181',
         role_id: getRoleId('super_admin'),
       },
       {
@@ -28,6 +30,8 @@ module.exports = {
         email: 'admin@example.com',
         password: await bcrypt.hash('adminuser', 10),
         name: 'Admin User',
+        gender: 2,
+        phone: '08282828282',
         role_id: getRoleId('admin'),
       },
       {
@@ -35,6 +39,8 @@ module.exports = {
         email: 'user@example.com',
         password: await bcrypt.hash('normaluser', 10),
         name: 'Normal User',
+        gender: 1,
+        phone: '08383838383',
         role_id: getRoleId('user'),
       },
     ];

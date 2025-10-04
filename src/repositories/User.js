@@ -50,14 +50,16 @@ class UserRepository {
     }
   }
 
-  async create({ email, password, name, roleId, status, createdBy }, ctx = {}) {
+  async create({ email, password, name, phone, gender, roleId, status, createdBy }, ctx = {}) {
     ctx.log?.info({ email }, 'repo_create_user');
     const user = await this.userModel.create({
       email,
       password,
       name,
+      phone,
+      gender,
       role_id: roleId,
-      status: status || 'active',
+      status: status || 1,
       created_by: createdBy
     });
     return user.toJSON();
@@ -137,6 +139,8 @@ class UserRepository {
       password: userData.password ?? user.password,
       name: userData.name ?? user.name,
       role_id: userData.roleId ?? user.role_id,
+      gender: userData.gender ?? user.gender,
+      phone: userData.phone ?? user.phone,
       status: userData.status ?? user.status,
       updated_by: userData.updatedBy ?? user.updated_by,
       updated_at: new Date()
