@@ -37,6 +37,7 @@ const UnitAttachmentRepository = require('./repositories/UnitAttachment');
 const TenantCategoryRepository = require('./repositories/TenantCategory');
 const UserAccessMenuRepository = require('./repositories/UserAccessMenu');
 const UserLogRepository = require('./repositories/UserLog');
+const UnitLogRepository = require('./repositories/UnitLog');
 
 // define usecase module
 const authUc = require('./usecases/Auth');
@@ -66,6 +67,7 @@ const { AssetAttachment } = require('./models/AssetAttachment');
 const modelUnitAttachment = require('./models/UnitAttachment');
 const modelTenantCategory = require('./models/TenantCategory');
 const modelUserLog = require('./models/UserLog');
+const modelUnitLog = require('./models/UnitLog');
 
 // initialize repository
 const userRepository = new UserRepository(User, modelRole);
@@ -84,6 +86,7 @@ const unitAttachmentRepository = new UnitAttachmentRepository(modelUnitAttachmen
 const tenantCategoryRepository = new TenantCategoryRepository(modelTenantCategory);
 const userAccessMenuRepository = new UserAccessMenuRepository(User, modelRole, modelRoleMenuPermission, modelMenu);
 const userLogRepository = new UserLogRepository(modelUserLog, User, modelRole)
+const unitLogRepository = new UnitLogRepository(modelUnitLog, Asset, User)
 
 // Setup model associations
 const models = {
@@ -104,6 +107,7 @@ const models = {
   UnitAttachment: modelUnitAttachment,
   TenantCategory: modelTenantCategory,
   UserLog: modelUserLog,
+  UnitLog: modelUnitLog,
 };
 
 // Setup associations
@@ -124,7 +128,7 @@ const authUsecase = new authUc(
   roleRepository
 );
 const userUsecase = new userUc(userRepository, userLogRepository);
-const unitUsecase = new unitUc(unitRepository, unitAttachmentRepository);
+const unitUsecase = new unitUc(unitRepository, unitAttachmentRepository, unitLogRepository);
 const tenantUsecase = new tenantUc(tenantRepository, tenantAttachmentRepository, tenantUnitRepository, mapTenantCategoryRepository, tenantCategoryRepository, unitRepository);
 const roleUsecase = new roleUc(roleRepository);
 const menuUsecase = new menuUc(menuRepository);

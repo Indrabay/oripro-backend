@@ -1,8 +1,10 @@
+const { Op } = require("sequelize");
+
 class UnitRepository {
   constructor(unitModel, assetModel, userModel) {
     this.assetModel = assetModel;
     this.userModel = userModel;
-    this.unitModel = unitModel
+    this.unitModel = unitModel;
   }
 
   async create(unitData, ctx, tx = null) {
@@ -20,20 +22,23 @@ class UnitRepository {
       description,
       is_deleted,
     } = unitData;
-    const unit = await this.unitModel.create({
-      name,
-      asset_id,
-      size,
-      rent_price,
-      lamp,
-      electric_socket: electrical_socket,
-      electrical_power,
-      electrical_unit,
-      is_toilet_exist,
-      description,
-      is_deleted,
-      created_by: ctx.userId
-    }, { transaction: tx });
+    const unit = await this.unitModel.create(
+      {
+        name,
+        asset_id,
+        size,
+        rent_price,
+        lamp,
+        electric_socket: electrical_socket,
+        electrical_power,
+        electrical_unit,
+        is_toilet_exist,
+        description,
+        is_deleted,
+        created_by: ctx.userId,
+      },
+      { transaction: tx }
+    );
 
     return unit.toJSON();
   }
@@ -43,18 +48,18 @@ class UnitRepository {
       include: [
         {
           model: this.assetModel,
-          as: 'asset',
-          attributes: ['id', 'name'],
+          as: "asset",
+          attributes: ["id", "name"],
         },
         {
           model: this.userModel,
-          as: 'createdBy',
-          attributes: ['id', 'name', 'email'],
+          as: "createdBy",
+          attributes: ["id", "name", "email"],
         },
         {
           model: this.userModel,
-          as: 'updatedBy',
-          attributes: ['id', 'name', 'email'],
+          as: "updatedBy",
+          attributes: ["id", "name", "email"],
         },
       ],
     });
@@ -68,27 +73,73 @@ class UnitRepository {
     return result;
   }
 
-  async findAll(filter = {}) {
-    const data = await this.unitModel.findAndCountAll({
-      where: filter,
-      include: [
-        {
-          model: this.assetModel,
-          as: 'asset',
-          attributes: ['id', 'name'],
-        },
-        {
-          model: this.userModel,
-          as: 'createdBy',
-          attributes: ['id', 'name', 'email'],
-        },
-        {
-          model: this.userModel,
-          as: 'updatedBy',
-          attributes: ['id', 'name', 'email'],
-        },
-      ],
-    });
+  async findAll(filter = {}, ctx) {
+    ctx.log?.info({}, "UnitRepository.findAll");
+    let whereQuery = {};
+    if (filter.asset_id || filter.name || filter.is_toilet_exist) {
+      whereQuery.where = {};
+      if (filter.asset_id) {
+        whereQuery.where.asset_id = filter.asset_id;
+      }
+
+      if (filter.name) {
+        const nameParam = filter.name.toLowerCase();
+        whereQuery.where.name = {
+          [Op.like]: `%${nameParam}%`,
+        };
+      }
+
+      if (filter.is_toilet_exist) {
+        whereQuery.where.is_toilet_exist = filter.is_toilet_exist;
+      }
+    }
+
+    if (filter.limit) {
+      whereQuery.limit = parseInt(filter.limit);
+    }
+
+    if (filter.offset) {
+      whereQuery.offset = parseInt(filter.offset);
+    }
+
+    if (filter.order) {
+      switch (filter.order) {
+        case "oldest":
+          order = [["updated_at", "ASC"]];
+          break;
+        case "newest":
+          order = [["updated_at", "DESC"]];
+          break;
+        case "a-z":
+          order = [["name", "ASC"]];
+          break;
+        case "z-a":
+          order = [["name", "DESC"]];
+        default:
+          break;
+      }
+
+      whereQuery.order = order;
+    }
+
+    whereQuery.include = [
+      {
+        model: this.assetModel,
+        as: "asset",
+        attributes: ["id", "name"],
+      },
+      {
+        model: this.userModel,
+        as: "createdBy",
+        attributes: ["id", "name", "email"],
+      },
+      {
+        model: this.userModel,
+        as: "updatedBy",
+        attributes: ["id", "name", "email"],
+      },
+    ];
+    const data = await this.unitModel.findAndCountAll(whereQuery);
     const result = {
       units: data.rows.map((u) => {
         const unit = u.toJSON();

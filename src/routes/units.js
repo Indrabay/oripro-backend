@@ -52,7 +52,7 @@ function InitUnitRouter(UnitUsecase) {
     if (!offset) offset = 0;
     if (!limit) limit = 10;
     try {
-      const units = await UnitUsecase.getAllUnits({ requestId: req.requestId, log: req.log, roleName: req.auth.roleName, userId: req.auth.userId });
+      const units = await UnitUsecase.getAllUnits(req.query, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName, userId: req.auth.userId });
       return res.status(200).json(createResponse(units.units, 'Units fetched successfully', 200, true,{ total: units.total, offset: offset, limit: limit }));
     } catch (error) {
       req.log?.error({ error: error.message, stack: error.stack }, 'route_units_list_error');
@@ -69,11 +69,11 @@ function InitUnitRouter(UnitUsecase) {
     [param('id').isString().notEmpty()],
     async (req, res) => {
       const errors = validationResult(req);
-      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+      if (!errors.isEmpty()) return res.status(400).json(createResponse(null, "bad request", 400, false, {}, errors));
       req.log?.info({ id: req.params.id }, 'route_units_get');
       try {
         const unit = await UnitUsecase.getUnitById(req.params.id, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName });
-        if (!unit) return res.status(404).json({ message: 'Unit not found' });
+        if (!unit) return res.status(404).json(createResponse(null, 'not found', 404 ));
         return res.status(200).json(createResponse(unit, 'Unit fetched successfully', 200));
       } catch (error) {
         req.log?.error({ error: error.message }, 'route_units_get_error');
@@ -98,7 +98,7 @@ function InitUnitRouter(UnitUsecase) {
     ],
     async (req, res) => {
       const errors = validationResult(req);
-      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+      if (!errors.isEmpty()) return res.status(400).json(createResponse(null, "bad request", 400, false, {}, errors));
       const { name, size, rent_price, lamp, electrical_socket, electrical_power, electrical_unit, is_toilet_exist, description } = req.body;
       req.log?.info({ id: req.params.id }, 'route_units_update');
       try {
@@ -113,15 +113,26 @@ function InitUnitRouter(UnitUsecase) {
           is_toilet_exist,
           description,
           updatedBy: req.auth.userId
-        }, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName });
-        if (!unit) return res.status(404).json({ message: 'Unit not found' });
-        return res.json(unit);
+        }, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName, userId: req.auth.userId });
+        if (!unit) return res.status(404).json(createReponse(null, 'not found', 404 ));
+        return res.status(202).json(createResponse(unit, "success", 202));
       } catch (error) {
         req.log?.error({ error: error.message }, 'route_units_update_error');
         return res.status(500).json(createResponse(null, 'Internal Server Error', 500));
       }
     }
   );
+
+  router.get("/:id/logs", async (req, res) => {
+    req.log?.info({ id: req.params.id }, 'UnitRouter.getLogs');
+    const unitLogs = await UnitUsecase.getUnitLogs(req.params.id, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName });
+
+    return res.status(200).json(createResponse(unitLogs, "success", 200, true, {
+      total: unitLogs.length,
+      limit: unitLogs.length,
+      offset: 0
+    }));
+  })
 
   return router;
 }
