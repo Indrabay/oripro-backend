@@ -3,6 +3,8 @@ const { AttachmentType } = require("../models/AssetAttachment");
 const moment = require("moment");
 const PrefixAsset = "ASSET";
 
+const { AssetStatusIntToStr, AssetTypeIntToStr } = require('../models/Asset');
+
 class AssetUsecase {
   constructor(assetRepository, assetLogRepository, assetAttachmentRepository) {
     this.assetRepository = assetRepository;
@@ -49,6 +51,9 @@ class AssetUsecase {
           await this.assetLogRepository.create(asset, ctx, t);
         }
 
+        asset.asset_type = AssetTypeIntToStr[asset.asset_type];
+        asset.status = AssetStatusIntToStr[asset.status];
+
         return asset;
       });
 
@@ -80,7 +85,13 @@ class AssetUsecase {
 
   async listAssets(queryParams, ctx) {
     if (ctx.roleName === "super_admin") {
-      return await this.assetRepository.listAll(queryParams, ctx);
+      const data = await this.assetRepository.listAll(queryParams, ctx);
+      data.assets.map(a => {
+        a.asset_type = AssetTypeIntToStr[a.asset_type];
+        a.status = AssetStatusIntToStr[a.status];
+        return a
+      })
+      return data
 
     }
     return await this.assetRepository.listForAdmin(ctx.userId, queryParams, ctx);
@@ -120,6 +131,8 @@ class AssetUsecase {
 
     asset.photos = photos;
     asset.sketch = sketchs;
+    asset.asset_type = AssetTypeIntToStr[asset.asset_type];
+        asset.status = AssetStatusIntToStr[asset.status];
     return asset;
   }
 
@@ -158,6 +171,17 @@ class AssetUsecase {
     }
     await this.assetRepository.delete(asset.id, ctx);
     return true;
+  }
+
+  async getAssetLogs(id, ctx) {
+    const assetLogs = await this.assetLogRepository.getByAssetID(id, ctx)
+
+    return assetLogs.map(al => {
+      al.asset_type = AssetTypeIntToStr[al.asset_type];
+        al.status = AssetStatusIntToStr[al.status];
+
+        return al
+    })
   }
 }
 

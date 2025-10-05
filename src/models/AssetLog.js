@@ -39,4 +39,11 @@ AssetLog.init({
   ],
 });
 
+AssetLog.associate = (models) => {
+  AssetLog.belongsTo(models.User, {
+    foreignKey: 'created_by',
+    as: 'createdBy',
+  })
+}
+
 module.exports = AssetLog;
