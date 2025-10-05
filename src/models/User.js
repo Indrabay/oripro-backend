@@ -13,6 +13,20 @@ const UserGenderIntToStr = {
   2: 'female'
 }
 
+const UserStatusStrToInt = {
+  'active': 1,
+  'inactive': 0,
+  'pending': 2,
+  'suspend': 3
+}
+
+const UserStatusIntToStr = {
+  1: 'active',
+  0: 'inactive',
+  2: 'pending',
+  3: 'suspend'
+}
+
 User.init({
   id: {
     type: DataTypes.UUID,
@@ -65,6 +79,16 @@ User.associate = (models) => {
     as: 'role',
     foreignKey: 'role_id',
   });
+
+  User.belongsTo(models.User, {
+    as: 'createdBy',
+    foreignKey: 'created_by'
+  });
+
+  User.belongsTo(models.User, {
+    as: 'updatedBy',
+    foreignKey: 'updated_by'
+  })
 };
 
-module.exports = { User, UserGenderStrToInt, UserGenderIntToStr };
+module.exports = { User, UserGenderStrToInt, UserGenderIntToStr, UserStatusIntToStr, UserStatusStrToInt };

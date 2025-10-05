@@ -46,6 +46,15 @@ module.exports = {
     ];
 
     await queryInterface.bulkInsert('users', users);
+    for (let i = 0; i < users.length; i++) {
+      let userLog = {
+        user_id: users[i].id,
+        ...users
+      }
+
+      delete userLog.id
+      await queryInterface.insert('user_logs', userLog)
+    }
   },
   down: async (queryInterface) => {
     await queryInterface.bulkDelete('users', null, {});

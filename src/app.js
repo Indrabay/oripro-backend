@@ -36,6 +36,7 @@ const AssetAttachmentRepository = require('./repositories/AssetAttachment');
 const UnitAttachmentRepository = require('./repositories/UnitAttachment');
 const TenantCategoryRepository = require('./repositories/TenantCategory');
 const UserAccessMenuRepository = require('./repositories/UserAccessMenu');
+const UserLogRepository = require('./repositories/UserLog');
 
 // define usecase module
 const authUc = require('./usecases/Auth');
@@ -64,6 +65,7 @@ const modelRoleMenuPermission = require('./models/RoleMenuPermission');
 const { AssetAttachment } = require('./models/AssetAttachment');
 const modelUnitAttachment = require('./models/UnitAttachment');
 const modelTenantCategory = require('./models/TenantCategory');
+const modelUserLog = require('./models/UserLog');
 
 // initialize repository
 const userRepository = new UserRepository(User, modelRole);
@@ -81,6 +83,7 @@ const assetAttachmentRepository = new AssetAttachmentRepository(AssetAttachment)
 const unitAttachmentRepository = new UnitAttachmentRepository(modelUnitAttachment);
 const tenantCategoryRepository = new TenantCategoryRepository(modelTenantCategory);
 const userAccessMenuRepository = new UserAccessMenuRepository(User, modelRole, modelRoleMenuPermission, modelMenu);
+const userLogRepository = new UserLogRepository(modelUserLog, User, modelRole)
 
 // Setup model associations
 const models = {
@@ -99,7 +102,8 @@ const models = {
   TenantUnit: modelTenantUnit,
   AssetAttachment: AssetAttachment,
   UnitAttachment: modelUnitAttachment,
-  TenantCategory: modelTenantCategory
+  TenantCategory: modelTenantCategory,
+  UserLog: modelUserLog,
 };
 
 // Setup associations
@@ -119,7 +123,7 @@ const authUsecase = new authUc(
   tokenRepository,
   roleRepository
 );
-const userUsecase = new userUc(userRepository);
+const userUsecase = new userUc(userRepository, userLogRepository);
 const unitUsecase = new unitUc(unitRepository, unitAttachmentRepository);
 const tenantUsecase = new tenantUc(tenantRepository, tenantAttachmentRepository, tenantUnitRepository, mapTenantCategoryRepository, tenantCategoryRepository, unitRepository);
 const roleUsecase = new roleUc(roleRepository);

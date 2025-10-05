@@ -1,4 +1,4 @@
-const createResponse = (data, message, status, is_list = false, pagination = {}) => {
+const createResponse = (data, message, status, is_list = false, pagination = {}, err = null) => {
   const responseObject = {
     data,
     message,
@@ -11,6 +11,10 @@ const createResponse = (data, message, status, is_list = false, pagination = {})
       limit: pagination.limit,
       offset: pagination.offset,
     };
+  }
+
+  if (err) {
+    responseObject.error = err
   }
 
   return responseObject;
