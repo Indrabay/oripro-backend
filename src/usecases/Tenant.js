@@ -2,21 +2,23 @@ const moment = require('moment');
 const sequelize = require('../models/sequelize');
 const dateFormat = "DD-MM-YYYY HH:mm"
 const PrefixTenant = "TENT"
-const { DurationUnit, DurationUnitStr } = require('../models/Tenant');
+const { DurationUnit, DurationUnitStr, TenantStatusIntToStr } = require('../models/Tenant');
 const { AttachmentType } = require('../models/TenantAttachment');
 
 
 class TenantUseCase {
-  constructor(tenantRepository, tenantAttachmentRepository, tenantUnitRepository, tenantCategoryMapRepo, tenantCategoryRepo, unitRepository) {
+  constructor(tenantRepository, tenantAttachmentRepository, tenantUnitRepository, tenantCategoryMapRepo, tenantCategoryRepo, unitRepository, tenantLogRepository) {
     this.tenantRepository = tenantRepository;
     this.tenantAttachmentRepository = tenantAttachmentRepository;
     this.tenantUnitRepository = tenantUnitRepository;
     this.tenantCategoryMapRepo = tenantCategoryMapRepo;
     this.tenantCategoryRepo = tenantCategoryRepo;
     this.unitRepository = unitRepository;
+    this.tenantLogRepository = tenantLogRepository;
   }
 
-  async createTenant(data) {
+  async createTenant(data, ctx) {
+    ctx.log?.info(data, "TenantUsecase.createTenant");
     try {
       const result = await sequelize.transaction(async t => {
         const createTenantData = {
@@ -28,6 +30,7 @@ class TenantUseCase {
           created_by: data.createdBy,
           rent_duration: data.rent_duration,
           rent_duration_unit: DurationUnit[data.rent_duration_unit],
+          status: 2 // pending
         }
         const tenant = await this.tenantRepository.create(createTenantData, t);
 
@@ -37,6 +40,21 @@ class TenantUseCase {
           await this.saveCategories(tenant, data.categories, data.createdBy, t)
           await this.saveTenantUnits(tenant, data.unit_ids, t)
         }
+
+        const tenantLog = {
+          tenant_id: tenant.id,
+          name: tenant.name,
+          user_id: tenant.user_id,
+          contract_begin_at: tenant.contract_begin_at,
+          contract_end_at: tenant.contract_end_at,
+          rent_duration: tenant.rent_duration,
+          rent_duration_unit: tenant.rent_duration_unit,
+          status: tenant.status,
+          code: tenant.code,
+          created_by: ctx.userId
+        }
+
+        await this.tenantLogRepository.create(tenantLog, ctx);
         return this.tenantToJson(tenant)
       });
 
@@ -109,7 +127,6 @@ class TenantUseCase {
         let units = []
         for (let i = 0; i < tenantUnits.length; i++) {
           let unit = await this.unitRepository.findById(tenantUnits[i].unit_id);
-          console.log('tenant', unit)
           units.push(unit);
         }
 
@@ -145,6 +162,8 @@ class TenantUseCase {
       }
     }
 
+    tenant.status = TenantStatusIntToStr[tenant.status]
+
     return tenant;
   }
 
@@ -158,6 +177,15 @@ class TenantUseCase {
 
   async deleteTenant(id) {
     return this.tenantRepository.delete(id);
+  }
+
+  async getTenantLogs(id, ctx) {
+    ctx.log?.info({tenant_id: id}, "TenantUsecase.getTenantLogs");
+    let tenantLogs = await this.tenantLogRepository.findByTenantID(id, ctx);
+    return tenantLogs.map(tl => {
+      tl.status = TenantStatusIntToStr[tl.status]
+      return tl
+    })
   }
 
   async tenantToJson(tenant) {

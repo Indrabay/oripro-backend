@@ -2,7 +2,7 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("unit-logs", {
+    await queryInterface.createTable("unit_logs", {
       id: {type: Sequelize.BIGINT, primaryKey: true, autoIncrement: true},
       unit_id: { type: Sequelize.UUID, allowNull: false },
       asset_id: Sequelize.UUID,
@@ -20,9 +20,9 @@ module.exports = {
       created_by: Sequelize.UUID,
     });
 
-    await queryInterface.addIndex('unit-logs', ['unit_id']);
+    await queryInterface.addIndex('unit_logs', ['unit_id']);
   },
   async down(queryInterface) {
-    await queryInterface.dropTable("unit-logs");
+    await queryInterface.dropTable("unit_logs");
   },
 };

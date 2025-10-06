@@ -32,7 +32,7 @@ TenantCategory.init({
 }, {
   sequelize,
   modelName: 'TenantCategory',
-  tableName: 'tenant-categories',
+  tableName: 'tenant_categories',
   timestamps: false,
 });
 

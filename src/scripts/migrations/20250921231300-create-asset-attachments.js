@@ -2,7 +2,7 @@
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
-    await queryInterface.createTable('asset-attachments', {
+    await queryInterface.createTable('asset_attachments', {
       id: {
         type: Sequelize.BIGINT,
         autoIncrement: true,
@@ -26,9 +26,9 @@ module.exports = {
       },
     });
 
-    await queryInterface.addIndex('asset-attachments', ['asset_id']);
+    await queryInterface.addIndex('asset_attachments', ['asset_id']);
   },
   down: async (queryInterface) => {
-    await queryInterface.dropTable('asset-attachments');
+    await queryInterface.dropTable('asset_attachments');
   }
 }

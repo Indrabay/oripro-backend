@@ -1,41 +1,17 @@
 const { DataTypes, Model } = require('sequelize');
 const sequelize = require('./sequelize');
 
-class Tenant extends Model {}
+class TenantLog extends Model {}
 
-const DurationUnit = {
-  "year": 0,
-  "month": 1
-}
-
-const DurationUnitStr = {
-  0: "year",
-  1: "month"
-}
-
-const TenantStatusStrToInt = {
-  'active': 1,
-  'inactive': 0,
-  'pending': 2,
-  'expired': 3,
-  'terminated': 4,
-  'blacklisted': 5
-}
-
-const TenantStatusIntToStr = {
-  0: 'inactive',
-  1: 'active',
-  2: 'pending',
-  3: 'expired',
-  4: 'terminated',
-  5: 'blacklisted'
-}
-
-Tenant.init({
+TenantLog.init({
   id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
+    type: DataTypes.BIGINT,
+    autoIncrement: true,
     primaryKey: true
+  },
+  tenant_id: {
+    type: DataTypes.UUID,
+    allowNull: false,
   },
   name: {
     type: DataTypes.STRING,
@@ -75,38 +51,26 @@ Tenant.init({
     type: DataTypes.UUID,
     allowNull: true
   },
-  updated_by: {
-    type: DataTypes.UUID,
-    allowNull: true
-  },
   created_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
   },
-  updated_at: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW,
-  }
 }, {
   sequelize,
-  modelName: 'Tenant',
-  tableName: 'tenants',
+  modelName: 'TenantLog',
+  tableName: 'tenant_logs',
   timestamps: false,
-});
+})
 
-Tenant.associate = (models) => {
-  Tenant.belongsTo(models.User, {
+TenantLog.associate = (models) => {
+  TenantLog.belongsTo(models.User, {
     foreignKey: 'created_by',
     as: 'createdBy',
   });
-  Tenant.belongsTo(models.User, {
-    foreignKey: 'updated_by',
-    as: 'updatedBy',
-  });
-  Tenant.belongsTo(models.User, {
+  TenantLog.belongsTo(models.User, {
     foreignKey: 'user_id',
     as: 'user'
   })
 }
 
-module.exports = {Tenant, DurationUnit, DurationUnitStr, TenantStatusIntToStr, TenantStatusStrToInt};
+module.exports = TenantLog;

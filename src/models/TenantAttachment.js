@@ -33,7 +33,7 @@ TenantAttachmentModel.init({
 }, {
   sequelize,
   modelName: 'TenantAttachment',
-  tableName: 'tenant-attachments',
+  tableName: 'tenant_attachments',
   timestamps: false,
 });
 

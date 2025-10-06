@@ -20,7 +20,7 @@ TenantUnit.init({
 }, {
   sequelize,
   modelName: 'TenantUnit',
-  tableName: 'tenant-unit',
+  tableName: 'tenant_units',
   timestamps: false,
 });
 

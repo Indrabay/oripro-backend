@@ -68,7 +68,7 @@ UnitLog.init(
   {
     sequelize,
     modelName: "UnitLog",
-    tableName: "unit-logs",
+    tableName: "unit_logs",
     timestamps: false,
     indexes: [{ fields: ["code"] }, { fields: ["asset_id"] }],
   }

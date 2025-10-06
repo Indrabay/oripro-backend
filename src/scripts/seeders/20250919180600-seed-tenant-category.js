@@ -23,9 +23,9 @@ module.exports = {
       },
     ];
 
-    await queryInterface.bulkInsert('tenant-categories', categories);
+    await queryInterface.bulkInsert('tenant_categories', categories);
   },
   down: async (queryInterface) => {
-    await queryInterface.bulkDelete('tenant-categories', null, {});
+    await queryInterface.bulkDelete('tenant_categories', null, {});
   }
 }

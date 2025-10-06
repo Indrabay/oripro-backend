@@ -2,7 +2,7 @@
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
-    await queryInterface.createTable('map-tenant-category', {
+    await queryInterface.createTable('map_tenant_category', {
       id: {
         type: Sequelize.BIGINT,
         autoIncrement: true,
@@ -30,6 +30,6 @@ module.exports = {
     });
   },
   down: async (queryInterface) => {
-    await queryInterface.dropTable('map-tenant-category');
+    await queryInterface.dropTable('map_tenant_category');
   }
 };

@@ -24,7 +24,7 @@ UnitAttachment.init({
 }, {
   sequelize,
   modelName: 'UnitAttachment',
-  tableName: 'unit-attachments',
+  tableName: 'unit_attachments',
   timestamps: false,
   indexes: [
     { fields: ['unit_id'] },

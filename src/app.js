@@ -38,6 +38,7 @@ const TenantCategoryRepository = require('./repositories/TenantCategory');
 const UserAccessMenuRepository = require('./repositories/UserAccessMenu');
 const UserLogRepository = require('./repositories/UserLog');
 const UnitLogRepository = require('./repositories/UnitLog');
+const TenantLogRepository = require('./repositories/TenantLog');
 
 // define usecase module
 const authUc = require('./usecases/Auth');
@@ -68,6 +69,7 @@ const modelUnitAttachment = require('./models/UnitAttachment');
 const modelTenantCategory = require('./models/TenantCategory');
 const modelUserLog = require('./models/UserLog');
 const modelUnitLog = require('./models/UnitLog');
+const modelTenantLog = require('./models/TenantLog');
 
 // initialize repository
 const userRepository = new UserRepository(User, modelRole);
@@ -76,7 +78,7 @@ const assetRepository = new AssetRepository(Asset, modelAdminAsset, User);
 const assetLogRepository = new AssetLogRepository(modelAssetLog, User);
 const unitRepository = new UnitRepository(modelUnit, Asset, User);
 const roleRepository = new RoleRepository(modelRole, modelRoleMenuPermission);
-const tenantRepository = new TenantRepository(Tenant);
+const tenantRepository = new TenantRepository(Tenant, User);
 const tenantAttachmentRepository = new TenantAttachmentRepository(TenantAttachmentModel)
 const mapTenantCategoryRepository = new MapTenantCategoryRepository(MapTenantCategory)
 const tenantUnitRepository = new TenantUnitRepository(modelTenantUnit)
@@ -87,6 +89,7 @@ const tenantCategoryRepository = new TenantCategoryRepository(modelTenantCategor
 const userAccessMenuRepository = new UserAccessMenuRepository(User, modelRole, modelRoleMenuPermission, modelMenu);
 const userLogRepository = new UserLogRepository(modelUserLog, User, modelRole)
 const unitLogRepository = new UnitLogRepository(modelUnitLog, Asset, User)
+const tenantLogRepository = new TenantLogRepository(modelTenantLog, User);
 
 // Setup model associations
 const models = {
@@ -108,6 +111,7 @@ const models = {
   TenantCategory: modelTenantCategory,
   UserLog: modelUserLog,
   UnitLog: modelUnitLog,
+  TenantLog: modelTenantLog,
 };
 
 // Setup associations
@@ -129,7 +133,7 @@ const authUsecase = new authUc(
 );
 const userUsecase = new userUc(userRepository, userLogRepository);
 const unitUsecase = new unitUc(unitRepository, unitAttachmentRepository, unitLogRepository);
-const tenantUsecase = new tenantUc(tenantRepository, tenantAttachmentRepository, tenantUnitRepository, mapTenantCategoryRepository, tenantCategoryRepository, unitRepository);
+const tenantUsecase = new tenantUc(tenantRepository, tenantAttachmentRepository, tenantUnitRepository, mapTenantCategoryRepository, tenantCategoryRepository, unitRepository, tenantLogRepository);
 const roleUsecase = new roleUc(roleRepository);
 const menuUsecase = new menuUc(menuRepository);
 const userAccessMenuUsecase = new userAccessMenuUc(userAccessMenuRepository);

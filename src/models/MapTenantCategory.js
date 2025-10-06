@@ -40,7 +40,7 @@ MapTenantCategory.init({
 }, {
   sequelize,
   modelName: 'MapTenantCategory',
-  tableName: 'map-tenant-category',
+  tableName: 'map_tenant_category',
   timestamps: false,
 });
 

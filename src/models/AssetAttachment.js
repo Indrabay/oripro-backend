@@ -33,7 +33,7 @@ AssetAttachment.init({
 }, {
   sequelize,
   modelName: 'AssetAttachment',
-  tableName: 'asset-attachments',
+  tableName: 'asset_attachments',
   timestamps: false,
   indexes: [
     { fields: ['asset_id'] },

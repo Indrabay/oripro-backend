@@ -44,7 +44,7 @@ UserLog.init({
 }, {
   sequelize,
   modelName: 'UserLog',
-  tableName: 'user-logs',
+  tableName: 'user_logs',
   timestamps: false,
 });
 
