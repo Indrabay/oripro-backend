@@ -123,6 +123,24 @@ function InitUnitRouter(UnitUsecase) {
     }
   );
 
+  router.delete(
+    '/:id',
+    [param('id').isString().notEmpty()],
+    async (req, res) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json(createResponse(null, "bad request", 400, false, {}, errors));
+      req.log?.info({ id: req.params.id }, 'route_units_delete');
+      try {
+        const unit = await UnitUsecase.deleteUnit(req.params.id, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName, userId: req.auth.userId });
+        if (!unit) return res.status(404).json(createResponse(null, 'Unit not found', 404));
+        return res.status(200).json(createResponse(unit, 'Unit deleted successfully', 200));
+      } catch (error) {
+        req.log?.error({ error: error.message }, 'route_units_delete_error');
+        return res.status(500).json(createResponse(null, 'Internal Server Error', 500));
+      }
+    }
+  );
+
   router.get("/:id/logs", async (req, res) => {
     req.log?.info({ id: req.params.id }, 'UnitRouter.getLogs');
     const unitLogs = await UnitUsecase.getUnitLogs(req.params.id, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName });

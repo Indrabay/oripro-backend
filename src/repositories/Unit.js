@@ -103,6 +103,7 @@ class UnitRepository {
     }
 
     if (filter.order) {
+      let order;
       switch (filter.order) {
         case "oldest":
           order = [["updated_at", "ASC"]];
@@ -115,6 +116,7 @@ class UnitRepository {
           break;
         case "z-a":
           order = [["name", "DESC"]];
+          break;
         default:
           break;
       }
