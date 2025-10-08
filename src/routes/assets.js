@@ -2,26 +2,25 @@ const { Router } = require("express");
 const { body, validationResult, param } = require("express-validator");
 const { authMiddleware, ensureRole } = require("../middleware/auth");
 const { createResponse } = require("../services/response");
+const uploadMiddleware = require("../middleware/uploader");
 
 function InitAssetRouter(AssetUsecase) {
   const router = Router();
 
   const createAssetParam = [
-    body("name").isString().notEmpty(),
+    body("name").isString().notEmpty().trim(),
     body("asset_type").isInt().notEmpty(),
-    body("address").isString().notEmpty(),
+    body("address").isString().notEmpty().trim(),
     body("area").isFloat().notEmpty(),
     body("status").optional().isInt(),
-    body("sketch").optional(),
-    body("photos").optional().isArray(),
-    body("description").optional().isString(),
+    body("description").optional().isString().trim(),
     body("longitude").isFloat({ min: -180, max: 180 }).notEmpty(),
     body("latitude").isFloat({ min: -90, max: 90 }).notEmpty(),
   ];
 
   router.use(authMiddleware, ensureRole);
 
-  router.post("/", createAssetParam, createAsset);
+  router.post("/", uploadMiddleware, createAssetParam, createAsset);
 
   router.get("/", async (req, res) => {
     let { name, asset_type, order, limit, offset } = req.query;
@@ -92,10 +91,13 @@ function InitAssetRouter(AssetUsecase) {
 
   async function createAsset(req, res) {
     const errors = validationResult(req);
-    if (!errors.isEmpty())
+    if (!errors.isEmpty()) {
+      console.log('Validation errors:', errors.array());
       return res
         .status(400)
         .json(createResponse(null, "bad request", 400, false, {}, errors));
+    }
+    
     const {
       name,
       asset_type,
@@ -105,13 +107,55 @@ function InitAssetRouter(AssetUsecase) {
       description,
       longitude,
       latitude,
-      sketch,
-      photos,
     } = req.body;
+    
+    // Generate unique code for asset
+    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const code = `AST-${timestamp}-${randomSuffix}`;
+    
+    console.log('Received data:', {
+      name,
+      code,
+      asset_type,
+      address,
+      area,
+      status,
+      description,
+      longitude,
+      latitude
+    });
+    
+    // Handle file uploads
+    let photos = [];
+    let sketch = null;
+    
+    if (req.files) {
+      const host = req.protocol + '://' + req.get('host');
+      
+      // Handle photos
+      if (req.files.photos && req.files.photos.length > 0) {
+        req.files.photos.forEach((file) => {
+          const relativePath = file.path.split('uploads')[1].replace(/\\/g, '/');
+          const urlPath = `${host}/uploads${relativePath}`;
+          photos.push(urlPath);
+        });
+      }
+      
+      // Handle sketch
+      if (req.files.sketch && req.files.sketch.length > 0) {
+        const file = req.files.sketch[0];
+        const relativePath = file.path.split('uploads')[1].replace(/\\/g, '/');
+        const urlPath = `${host}/uploads${relativePath}`;
+        sketch = urlPath;
+      }
+    }
+    
     req.log?.info({ name }, "route_assets_create");
     const asset = await AssetUsecase.createAsset(
       {
         name,
+        code,
         description,
         asset_type,
         address,

@@ -82,7 +82,7 @@ class UnitUsecase {
       throw new Error("Unit not found");
     }
     const updatedData = {
-      asset_id: data.asset_id ?? unit.asset_id,
+      asset_id: data.asset_id ?? unit.asset?.id,
       name: data.name ?? unit.name,
       size: data.size ?? unit.size,
       rent_price: data.rent_price ?? unit.rent_price,
@@ -100,7 +100,7 @@ class UnitUsecase {
       console.log('aman update unit')
       const unitLog = {
         unit_id: updatedUnit.id,
-        asset_id: updatedUnit.asset_id,
+        asset_id: data.asset_id ?? unit.asset?.id,
         name: updatedUnit.name,
         size: updatedUnit.size,
         rent_price: updatedUnit.rent_price,

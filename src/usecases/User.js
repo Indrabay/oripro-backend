@@ -3,6 +3,7 @@ const {
   UserGenderStrToInt,
   UserGenderIntToStr,
   UserStatusIntToStr,
+  UserStatusStrToInt,
 } = require("../models/User");
 
 class UserUsecase {
@@ -58,6 +59,7 @@ class UserUsecase {
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
     data.gender = UserGenderStrToInt[data.gender];
+    data.status = UserStatusStrToInt[data.status];
 
     const user = await this.userRepository.create(
       {
@@ -100,6 +102,10 @@ class UserUsecase {
 
     if (data.gender) {
       data.gender = UserGenderStrToInt[data.gender];
+    }
+
+    if (data.status) {
+      data.status = UserStatusStrToInt[data.status];
     }
 
     // Hash password if it's being updated

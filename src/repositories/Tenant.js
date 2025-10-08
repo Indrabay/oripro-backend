@@ -34,7 +34,8 @@ class TenantRepository {
     let result = tenant.toJSON();
     result.created_by = result.createdBy
     result.updated_by = result.updatedBy
-    delete result.user_id
+    // Keep user_id for frontend
+    // delete result.user_id
     delete result.createdBy
     delete result.updatedBy
     return result;
@@ -55,7 +56,7 @@ class TenantRepository {
         whereQuery.where.status = filter.status;
       }
     }
-    return this.tenantModel.findAll({ where });
+    return this.tenantModel.findAll(whereQuery);
   }
 
   async update(id, data) {

@@ -5,8 +5,10 @@ const path = require("path");
 function uploadMiddleware(req, res, next) {
   const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-      const uploadPath = path.join("public/uploads", req.path);
-      console.log(uploadPath)
+      // Use the type parameter from the route for tenant uploads
+      const uploadType = req.params.type || req.path.split('/').pop() || 'general';
+      const uploadPath = path.join("public/uploads", uploadType);
+      console.log('Upload path:', uploadPath, 'Type:', uploadType, 'Path:', req.path)
       fs.mkdirSync(uploadPath, { recursive: true });
 
       cb(null, uploadPath);
@@ -22,9 +24,14 @@ function uploadMiddleware(req, res, next) {
     limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
   });
 
-  const uploadHandler = upload.array("files", 10);
+  const uploadHandler = upload.fields([
+    { name: 'photos', maxCount: 10 },
+    { name: 'sketch', maxCount: 1 },
+    { name: 'file', maxCount: 10 }
+  ]);
 
   uploadHandler(req, res, function (err) {
+    
     if (err instanceof multer.MulterError) {
       if (err.code === "LIMIT_FILE_SIZE") {
         return res
@@ -36,9 +43,10 @@ function uploadMiddleware(req, res, next) {
       return res.status(400).json({ error: err.message });
     }
 
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ error: "No files uploaded" });
-    }
+    // File upload is optional for asset creation
+    // if (!req.files || req.files.length === 0) {
+    //   return res.status(400).json({ error: "No files uploaded" });
+    // }
 
     next();
   });
