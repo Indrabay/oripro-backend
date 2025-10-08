@@ -36,6 +36,8 @@ function InitTenantRouter(TenantUseCase) {
         categories,
         user_id,
       } = req.body;
+
+      
       const tenant = await TenantUseCase.createTenant({
         name, tenant_identifications, contract_documents, contract_begin_at, unit_ids, rent_duration, rent_duration_unit, user_id, categories,createdBy: req.auth.userId
       }, {userId: req.auth.userId});
@@ -53,8 +55,9 @@ function InitTenantRouter(TenantUseCase) {
     req.query.offset = offset
     try {
       const data = await TenantUseCase.getAllTenants(req.query);
-      res.status(200).json(createResponse(data.tenants, "success", 200, true, {
-        total: data.total,
+      
+      res.status(200).json(createResponse(data, "success", 200, true, {
+        total: data.length,
         limit: limit,
         offset: offset
       }));
@@ -105,7 +108,6 @@ function InitTenantRouter(TenantUseCase) {
         offset: 0
       }));
     } catch (err) {
-      console.log(err)
       res.status(500).json(createResponse(null, "internal server error", 500))
     }
   })

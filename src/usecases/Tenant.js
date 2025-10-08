@@ -60,7 +60,6 @@ class TenantUseCase {
 
       return result;
     } catch (error) {
-      console.log(error)
     }
   }
 
@@ -168,7 +167,57 @@ class TenantUseCase {
   }
 
   async getAllTenants(filter = {}) {
-    return this.tenantRepository.findAll(filter);
+    const tenants = await this.tenantRepository.findAll(filter);
+    
+    // Process each tenant to include attachments, units, and categories
+    const processedTenants = await Promise.all(tenants.map(async (tenant) => {
+      // Get tenant units
+      const tenantUnits = await this.tenantUnitRepository.getByTenantID(tenant.id);
+      if (tenantUnits.length > 0) {
+        let units = []
+        for (let i = 0; i < tenantUnits.length; i++) {
+          let unit = await this.unitRepository.findById(tenantUnits[i].unit_id);
+          units.push(unit);
+        }
+        tenant.units = units;
+      }
+
+      // Get tenant attachments
+      const attachments = await this.tenantAttachmentRepository.getByTenantID(tenant.id)
+      if (attachments.length > 0) {
+        let idAttachments = [];
+        let contractAttachments = [];
+        for (let i = 0; i < attachments.length; i++) {
+          if (attachments[i].attachment_type == AttachmentType['id']) {
+            idAttachments.push(attachments[i].url)
+          } else {
+            contractAttachments.push(attachments[i].url)
+          }
+        }
+
+        tenant.tenant_identifications = idAttachments;
+        tenant.contract_documents = contractAttachments;
+        
+      }
+
+      // Get tenant categories
+      const tenantCategories = await this.tenantCategoryMapRepo.findByTenantID(tenant.id)
+      if (tenantCategories.length > 0) {
+        let categories = []
+        for (let i = 0; i < tenantCategories.length; i++) {
+          let category = await this.tenantCategoryRepo.getByID(tenantCategories[i].category_id)
+          categories.push(category)
+        }
+        tenant.categories = categories;
+      }
+
+      // Convert status to string
+      tenant.status = TenantStatusIntToStr[tenant.status]
+      
+      return tenant;
+    }));
+    
+    return processedTenants;
   }
 
   async updateTenant(id, data) {
