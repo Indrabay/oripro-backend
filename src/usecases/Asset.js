@@ -20,7 +20,7 @@ class AssetUsecase {
           description: data.description,
           asset_type: data.asset_type,
           status: data.status,
-          code: this.generateCode(),
+          code: data.code || this.generateCode(),
           is_deleted: data.is_deleted,
           address: data.address,
           area: data.area,
