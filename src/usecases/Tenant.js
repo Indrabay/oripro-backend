@@ -60,6 +60,8 @@ class TenantUseCase {
 
       return result;
     } catch (error) {
+      console.error('Error in createTenant:', error);
+      throw error;
     }
   }
 
