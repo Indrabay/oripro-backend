@@ -180,8 +180,16 @@ app.use(
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
-app.use(express.static(path.join(__dirname, '../public')));
-app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
+app.use(express.static(path.join(__dirname, '../public'), {
+  setHeaders: (res, path) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  }
+}));
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads'), {
+  setHeaders: (res, path) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  }
+}));
 
 // Routes
 app.use('/api/auth', authRouter);
@@ -196,7 +204,6 @@ app.get('/metrics', metricsHandler);
 
 // 404 handler
 app.use((_req, res) => {
-  console.log("im here")
   res.status(404).json({ message: 'Not Found' });
 });
 

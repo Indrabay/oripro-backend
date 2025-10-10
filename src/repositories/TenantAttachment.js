@@ -3,8 +3,14 @@ class TenantAttachmentRepositoy {
     this.tenantAttachmentModel = tenantAttachmentModel;
   }
 
-  async create(data, tx = null) {
-    return this.tenantAttachmentModel.create(data, {transaction: tx});
+  async create(data, tx = null, ctx) {
+    try {
+      ctx.log?.info(data, "TenantAttachmentRepository.create");
+      return this.tenantAttachmentModel.create(data, {transaction: tx});
+    } catch (error) {
+      ctx.log?.error(data, "TenantAttachmentRepository.create_error");
+      throw new Error(`error create tenant attachment. with err: ${error.message}`);
+    }
   }
 
   async getByTenantID(tenantID) {

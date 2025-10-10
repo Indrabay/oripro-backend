@@ -5,8 +5,13 @@ class TenantLogRepository {
   }
 
   async create(data, ctx) {
-    ctx.log?.info(data, "TenantLogRepository.create");
+    try {
+      ctx.log?.info(data, "TenantLogRepository.create");
     await this.tenantLogModel.create(data);
+    } catch (error) {
+      ctx.log?.error(data, "TenantLogRepository.create_error");
+      throw new Error(`error when create tenant log. with err: ${error.message}`);
+    }
   }
 
   async findByTenantID(id, ctx) {
