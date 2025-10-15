@@ -14,6 +14,7 @@ const user = require('./routes/users');
 const units = require('./routes/units');
 const tenant = require('./routes/tenants');
 const uploadsRouter = require('./routes/uploads');
+const { InitAttendanceRouter } = require('./routes/attendances');
 const { InitRoleRouter } = require('./routes/roles');
 const { InitMenuRouter } = require('./routes/menus');
 const { requestContext } = require('./middleware/requestContext');
@@ -39,6 +40,7 @@ const UserAccessMenuRepository = require('./repositories/UserAccessMenu');
 const UserLogRepository = require('./repositories/UserLog');
 const UnitLogRepository = require('./repositories/UnitLog');
 const TenantLogRepository = require('./repositories/TenantLog');
+const AttendanceRepository = require('./repositories/Attendance');
 
 // define usecase module
 const authUc = require('./usecases/Auth');
@@ -49,6 +51,7 @@ const tenantUc = require('./usecases/Tenant');
 const roleUc = require('./usecases/Role');
 const menuUc = require('./usecases/Menu');
 const userAccessMenuUc = require('./usecases/UserAccessMenu');
+const attendanceUc = require('./usecases/Attendance');
 
 // define models database
 const {User} = require('./models/User');
@@ -137,6 +140,8 @@ const tenantUsecase = new tenantUc(tenantRepository, tenantAttachmentRepository,
 const roleUsecase = new roleUc(roleRepository);
 const menuUsecase = new menuUc(menuRepository);
 const userAccessMenuUsecase = new userAccessMenuUc(userAccessMenuRepository);
+const attendanceRepository = new AttendanceRepository();
+const attendanceUsecase = new attendanceUc(attendanceRepository);
 
 // initalize router
 const authRouter = auth.InitAuthRouter(authUsecase);
@@ -146,6 +151,7 @@ const unitRouter = units.InitUnitRouter(unitUsecase);
 const tenantRouter = tenant.InitTenantRouter(tenantUsecase);
 const roleRouter = InitRoleRouter(roleUsecase);
 const menuRouter = InitMenuRouter(menuUsecase);
+const attendanceRouter = InitAttendanceRouter(attendanceUsecase);
 const uploadFileRouter = uploadsRouter.InitUploadRouter();
 
 // Middleware
@@ -192,6 +198,7 @@ app.use('/api/tenants', tenantRouter);
 app.use('/api/roles', roleRouter);
 app.use('/api/menus', menuRouter);
 app.use('/api/uploads', uploadFileRouter);
+app.use('/api/attendances', attendanceRouter);
 app.get('/metrics', metricsHandler);
 
 // 404 handler
