@@ -39,6 +39,7 @@ const UserAccessMenuRepository = require('./repositories/UserAccessMenu');
 const UserLogRepository = require('./repositories/UserLog');
 const UnitLogRepository = require('./repositories/UnitLog');
 const TenantLogRepository = require('./repositories/TenantLog');
+const UserAssetRepository = require('./repositories/UserAsset');
 
 // define usecase module
 const authUc = require('./usecases/Auth');
@@ -70,6 +71,7 @@ const modelTenantCategory = require('./models/TenantCategory');
 const modelUserLog = require('./models/UserLog');
 const modelUnitLog = require('./models/UnitLog');
 const modelTenantLog = require('./models/TenantLog');
+const modelUserAsset = require('./models/UserAsset');
 
 // initialize repository
 const userRepository = new UserRepository(User, modelRole);
@@ -90,6 +92,7 @@ const userAccessMenuRepository = new UserAccessMenuRepository(User, modelRole, m
 const userLogRepository = new UserLogRepository(modelUserLog, User, modelRole)
 const unitLogRepository = new UnitLogRepository(modelUnitLog, Asset, User)
 const tenantLogRepository = new TenantLogRepository(modelTenantLog, User);
+const userAssetRepository = new UserAssetRepository(modelUserAsset);
 
 // Setup model associations
 const models = {
@@ -112,6 +115,7 @@ const models = {
   UserLog: modelUserLog,
   UnitLog: modelUnitLog,
   TenantLog: modelTenantLog,
+  UserAsset: modelUserAsset,
 };
 
 // Setup associations
@@ -129,9 +133,10 @@ const authUsecase = new authUc(
   process.env.TOKEN_TTL || '1h',
   process.env.APP_BASE_URL || 'http://localhost:3000',
   tokenRepository,
-  roleRepository
+  roleRepository,
+  userAssetRepository,
 );
-const userUsecase = new userUc(userRepository, userLogRepository);
+const userUsecase = new userUc(userRepository, userLogRepository, userAssetRepository);
 const unitUsecase = new unitUc(unitRepository, unitAttachmentRepository, unitLogRepository);
 const tenantUsecase = new tenantUc(tenantRepository, tenantAttachmentRepository, tenantUnitRepository, mapTenantCategoryRepository, tenantCategoryRepository, unitRepository, tenantLogRepository);
 const roleUsecase = new roleUc(roleRepository);
