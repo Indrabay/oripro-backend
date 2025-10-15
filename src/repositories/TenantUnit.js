@@ -3,8 +3,14 @@ class TenantUnitRepository {
     this.tenantUnitModel = tenantUnitModel;
   }
 
-  async create(data, tx) {
-    return this.tenantUnitModel.create(data, {transaction: tx});
+  async create(data, tx, ctx) {
+    try {
+      ctx.log?.info(data, "TenantUnitRepository.create");
+      return this.tenantUnitModel.create(data, {transaction: tx});
+    } catch (error) {
+      ctx.log?.error(data, "TenantUnitRepository.create_error");
+      throw new Error(`error when create tenant unit. with err: ${error.message}`);
+    }
   }
 
   async getByTenantID(id) {

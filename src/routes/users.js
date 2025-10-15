@@ -118,6 +118,7 @@ function InitUserRouter(userUsecase, userAccessMenuUsecase) {
       .optional()
       .isIn(["active", "inactive", "pending", "suspended"]),
     body("roleId").isInt().notEmpty(),
+    body("assetIds").optional().isArray(),
   ];
 
   const createUser = async (req, res) => {
@@ -151,15 +152,16 @@ function InitUserRouter(userUsecase, userAccessMenuUsecase) {
     body("status")
       .optional()
       .isIn(["active", "inactive", "pending", "suspended"]),
-    body("roleId").optional().isInt().notEmpty(),
+    body("roleId").optional().isInt(),
+    body("assetIds").optional().isArray(),
   ];
 
   const updateUser = async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty())
       return res.status(400).json(createResponse(null, "bad request", 400, false, {}, errors));
-    req.log?.info({ id: req.params.id }, "UserRouter.updateUser");
     try {
+      req.log?.info({ id: req.params.id, body: req.body }, "UserRouter.updateUser");
       const updatedUser = await userUsecase.updateUser(
         req.params.id,
         req.body,

@@ -7,15 +7,15 @@ const {
 } = require("../models/User");
 
 class UserUsecase {
-  constructor(userRepository, userLogRepository) {
+  constructor(userRepository, userLogRepository, userAssetRepository) {
     this.userRepository = userRepository;
     this.userLogRepository = userLogRepository;
+    this.userAssetRepository = userAssetRepository;
   }
   async listUsers(filters, ctx) {
     ctx.log?.info({}, "usecase_list_users");
     if (ctx.roleName === "super_admin") {
       const data = await this.userRepository.listAll(filters, ctx);
-      console.log(data.users)
       return {
         users: data.users.map((user) => {
           const { password, ...userWithoutPassword } = user;
@@ -45,6 +45,9 @@ class UserUsecase {
     userWithoutPassword.status = UserStatusIntToStr[userWithoutPassword.status];
     userWithoutPassword.created_by = userWithoutPassword.createdBy;
     userWithoutPassword.updated_by = userWithoutPassword.updatedBy;
+
+    const userAssets = await this.userAssetRepository.getByUserID(user.id, ctx);
+    userWithoutPassword.assetIds = userAssets.map(ua => ua.asset_id);
 
     delete userWithoutPassword.createdBy;
     delete userWithoutPassword.updatedBy;
@@ -83,6 +86,15 @@ class UserUsecase {
         created_by: ctx.userId,
       };
 
+      if (data.assetIds && data.assetIds.length > 0) {
+        for (let i = 0; i < data.assetIds.length; i++) {
+          await this.userAssetRepository.create({
+            user_id: user.id,
+            asset_id: data.assetIds[i],
+          }, ctx);
+        }
+      }
+
       await this.userLogRepository.create(userLog, ctx);
     }
     const { password, ...userWithoutPassword } = user;
@@ -116,6 +128,37 @@ class UserUsecase {
 
     const updatedUser = await this.userRepository.update(id, updateData, ctx);
     if (!updatedUser) return null;
+    if (data.assetIds && data.assetIds.length > 0) {
+      let userAssets = await this.userAssetRepository.getByUserID(updatedUser.id, ctx);
+      let asset_ids = userAssets.map(ua => ua.asset_id);
+      let deletedAsset = []
+      let createdAsset = []
+      for (let i = 0; i < asset_ids.length; i++) {
+        if (!data.assetIds.includes(asset_ids[i])) {
+          deletedAsset.push(asset_ids[i])
+        }
+      }
+
+      for (let i = 0; i < data.assetIds.length; i++) {
+        if (!asset_ids.includes(data.assetIds[i])) {
+          createdAsset.push(data.assetIds[i])
+        }
+      }
+
+      createdAsset.forEach(async (asset) => {
+        await this.userAssetRepository.create({
+          user_id: updatedUser.id,
+          asset_id: asset
+        }, ctx);
+      })
+
+      deletedAsset.forEach(async (asset) => {
+        await this.userAssetRepository.remove({
+          user_id: updatedUser.id,
+          asset_id: asset
+        }, ctx);
+      })
+    }
     const userLog = {
       user_id: updatedUser.id,
       email: updatedUser.email,
@@ -165,11 +208,11 @@ class UserUsecase {
   async getUserLogs(userId, ctx) {
     ctx.log?.info({ userId }, "UserUsecase.getUserLogs");
     const userLogs = await this.userLogRepository.getByUserID(userId, ctx);
-    return userLogs.map(ul => {
-      ul.created_by = ul.createdBy
+    return userLogs.map((ul) => {
+      ul.created_by = ul.createdBy;
       ul.status = UserStatusIntToStr[ul.status];
       ul.gender = UserGenderIntToStr[ul.gender];
-      delete ul.createdBy
+      delete ul.createdBy;
       return ul;
     });
   }

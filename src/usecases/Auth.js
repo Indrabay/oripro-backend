@@ -4,13 +4,14 @@ const crypto = require('crypto');
 const { sendPasswordResetEmail } = require('../services/Mailer');
 
 class AuthUsecase {
-  constructor(userRepository, jwtSecret, tokenTtl = '1h', appBaseUrl, tokenRepository, roleRepository) {
+  constructor(userRepository, jwtSecret, tokenTtl = '1h', appBaseUrl, tokenRepository, roleRepository, userAssetRepository) {
     this.userRepository = userRepository;
     this.jwtSecret = jwtSecret;
     this.tokenTtl = tokenTtl;
     this.appBaseUrl = appBaseUrl;
     this.tokenRepository = tokenRepository;
     this.roleRepository = roleRepository;
+    this.userAssetRepository = userAssetRepository;
   }
 
   async login({ email, password }, ctx) {
@@ -32,13 +33,15 @@ class AuthUsecase {
     }
 
     const role = await this.roleRepository.findById(user.role_id, ctx);
+    const userAssets = await this.userAssetRepository.getByUserID(user.id, ctx)
 
     const token = jwt.sign(
       {
         sub: user.id,
         email: user.email,
         roleId: user.role_id,
-        roleName: role.name
+        roleName: role.name,
+        assetIds: userAssets.map(ua => ua.asset_id)
       },
       this.jwtSecret,
       { expiresIn: this.tokenTtl }
