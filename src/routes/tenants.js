@@ -85,26 +85,43 @@ function InitTenantRouter(TenantUseCase) {
 
   router.put('/:id', async (req, res) => {
     try {
-      const updated = await TenantUseCase.updateTenant(req.params.id, req.body);
+      req.log?.info({ tenant_id: req.params.id, update_data: req.body }, "TenantRouter.updateTenant");
+      const updated = await TenantUseCase.updateTenant(req.params.id, req.body, {log: req.log, userId: req.auth.userId});
       res.status(202).json(createResponse(updated, "success", 202));
     } catch (err) {
+      req.log?.error({ tenant_id: req.params.id, update_data: req.body }, `TenantRouter.updateTenant_error: ${err.message}`);
       res.status(500).json(createResponse(null, "internal server error", 500));
     }
   });
 
-  router.delete('/:id', async (req, res) => {
+  router.delete('/:id', [
+    param('id').isUUID().withMessage('ID must be a valid UUID')
+  ], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json(createResponse(null, "bad request", 400, false, {}, errors));
+    }
+    
     try {
-      await TenantUseCase.deleteTenant(req.params.id);
+      req.log?.info({ tenant_id: req.params.id }, "TenantRouter.deleteTenant");
+      await TenantUseCase.deleteTenant(req.params.id, {log: req.log, userId: req.auth.userId});
       res.status(204).send();
     } catch (err) {
-      res.status(400).json({ error: err.message });
+      req.log?.error({ tenant_id: req.params.id }, `TenantRouter.deleteTenant_error: ${err.message}`);
+      if (err.message === 'Tenant not found') {
+        res.status(404).json(createResponse(null, "Tenant not found", 404));
+      } else {
+        res.status(500).json(createResponse(null, "Internal server error", 500));
+      }
     }
   });
 
   router.get('/:id/logs', async (req, res) => {
     try {
+      req.log?.info({ tenant_id: req.params.id }, "TenantRouter.getTenantLogs");
       const tenantLogs = await TenantUseCase.getTenantLogs(req.params.id, {
-        userId: req.auth.userId
+        userId: req.auth.userId,
+        log: req.log
       })
 
       res.status(200).json(createResponse(tenantLogs, "success", 200, true, {
@@ -113,6 +130,7 @@ function InitTenantRouter(TenantUseCase) {
         offset: 0
       }));
     } catch (err) {
+      req.log?.error({ tenant_id: req.params.id }, `TenantRouter.getTenantLogs_error: ${err.message}`);
       res.status(500).json(createResponse(null, "internal server error", 500))
     }
   })

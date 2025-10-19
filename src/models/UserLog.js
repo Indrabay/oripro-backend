@@ -41,10 +41,6 @@ UserLog.init({
 });
 
 UserLog.associate = (models) => {
-  UserLog.belongsTo(models.User, {
-    as: 'user',
-    foreignKey: 'user_id',
-  });
 
   UserLog.belongsTo(models.User, {
     as: 'createdBy',

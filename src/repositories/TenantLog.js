@@ -7,7 +7,9 @@ class TenantLogRepository {
   async create(data, ctx) {
     try {
       ctx.log?.info(data, "TenantLogRepository.create");
-    await this.tenantLogModel.create(data);
+      await this.tenantLogModel.create(data, {
+        transaction: ctx.transaction
+      });
     } catch (error) {
       ctx.log?.error(data, "TenantLogRepository.create_error");
       throw new Error(`error when create tenant log. with err: ${error.message}`);
@@ -22,11 +24,6 @@ class TenantLogRepository {
       include: [
         {
           model: this.userModel,
-          as: 'user',
-          attributes: ['id', 'name', 'email']
-        },
-        {
-          model: this.userModel,
           as: 'createdBy',
           attributes: ['id', 'name', 'email']
         },
@@ -37,7 +34,6 @@ class TenantLogRepository {
       let tenantLog = tl.toJSON()
       tenantLog.created_by = tenantLog.createdBy
       delete tenantLog.createdBy
-      delete tenantLog.user_id
 
       return tenantLog
     })
