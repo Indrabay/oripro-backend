@@ -1,7 +1,10 @@
+const { Op } = require("sequelize");
+
 class ScanInfoRepository {
-  constructor(scanInfoModel, userModel) {
+  constructor(scanInfoModel, userModel, assetModel) {
     this.scanInfoModel = scanInfoModel;
     this.userModel = userModel;
+    this.assetModel = assetModel;
   }
 
   async create(data, ctx = {}, tx = null) {
@@ -11,6 +14,7 @@ class ScanInfoRepository {
         scan_code: data.scan_code,
         latitude: data.latitude,
         longitude: data.longitude,
+        asset_id: data.asset_id,
         created_by: ctx.userId,
       }, { transaction: tx });
       return scanInfo.toJSON();
@@ -34,6 +38,11 @@ class ScanInfoRepository {
             model: this.userModel,
             as: 'updatedBy',
             attributes: ['id', 'name', 'email']
+          },
+          {
+            model: this.assetModel,
+            as: 'asset',
+            attributes: ['id', 'name', 'code', 'asset_type', 'status']
           }
         ]
       });
@@ -60,6 +69,11 @@ class ScanInfoRepository {
             model: this.userModel,
             as: 'updatedBy',
             attributes: ['id', 'name', 'email']
+          },
+          {
+            model: this.assetModel,
+            as: 'asset',
+            attributes: ['id', 'name', 'code', 'asset_type', 'status']
           }
         ]
       });
@@ -73,33 +87,96 @@ class ScanInfoRepository {
   async listAll(queryParams = {}, ctx = {}) {
     try {
       ctx.log?.info(queryParams, 'ScanInfoRepository.listAll');
-      const { page = 1, limit = 10 } = queryParams;
-      const offset = (page - 1) * limit;
+      let whereQuery = {};
+      
+      // Build where clause for filtering
+      if (queryParams.asset_id || queryParams.scan_code) {
+        whereQuery.where = {};
+        if (queryParams.asset_id) {
+          whereQuery.where.asset_id = queryParams.asset_id;
+        }
+        if (queryParams.scan_code) {
+          whereQuery.where.scan_code = queryParams.scan_code;
+        }
+      }
 
-      const { rows, count } = await this.scanInfoModel.findAndCountAll({
-        limit: parseInt(limit),
-        offset: parseInt(offset),
-        order: [['created_at', 'DESC']],
-        include: [
-          {
-            model: this.userModel,
-            as: 'createdBy',
-            attributes: ['id', 'name', 'email']
-          },
-          {
-            model: this.userModel,
-            as: 'updatedBy',
-            attributes: ['id', 'name', 'email']
-          }
-        ]
-      });
+      // Handle pagination
+      if (queryParams.limit) {
+        whereQuery.limit = parseInt(queryParams.limit);
+      }
+      if (queryParams.offset) {
+        whereQuery.offset = parseInt(queryParams.offset);
+      }
+
+      // Handle ordering
+      let order;
+      if (queryParams.order) {
+        switch (queryParams.order) {
+          case "oldest":
+            order = [["created_at", "ASC"]];
+            break;
+          case "newest":
+            order = [["created_at", "DESC"]];
+            break;
+          case "a-z":
+            order = [["scan_code", "ASC"]];
+            break;
+          case "z-a":
+            order = [["scan_code", "DESC"]];
+            break;
+          case "asset-a-z":
+            order = [
+              [{ model: this.assetModel, as: 'asset' }, 'name', 'ASC']
+            ];
+            break;
+          case "asset-z-a":
+            order = [
+              [{ model: this.assetModel, as: 'asset' }, 'name', 'DESC']
+            ];
+            break;
+          case "user-a-z":
+            order = [
+              [{ model: this.userModel, as: 'createdBy' }, 'name', 'ASC']
+            ];
+            break;
+          case "user-z-a":
+            order = [
+              [{ model: this.userModel, as: 'createdBy' }, 'name', 'DESC']
+            ];
+            break;
+          default:
+            order = [["created_at", "DESC"]];
+            break;
+        }
+        whereQuery.order = order;
+      } else {
+        whereQuery.order = [["created_at", "DESC"]];
+      }
+
+      // Include related models
+      whereQuery.include = [
+        {
+          model: this.userModel,
+          as: 'createdBy',
+          attributes: ['id', 'name', 'email']
+        },
+        {
+          model: this.userModel,
+          as: 'updatedBy',
+          attributes: ['id', 'name', 'email']
+        },
+        {
+          model: this.assetModel,
+          as: 'asset',
+          attributes: ['id', 'name', 'code', 'asset_type', 'status']
+        }
+      ];
+
+      const { rows, count } = await this.scanInfoModel.findAndCountAll(whereQuery);
 
       return {
         scanInfos: rows.map(si => si.toJSON()),
         total: count,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil(count / limit),
       };
     } catch (error) {
       ctx.log?.error({ queryParams, error }, 'ScanInfoRepository.listAll_error');

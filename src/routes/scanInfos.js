@@ -157,6 +157,7 @@ function InitScanInfoRouter(scanInfoUsecase) {
     body("scan_code").isString().notEmpty().trim(),
     body("latitude").isFloat().optional(),
     body("longitude").isFloat().optional(),
+    body("asset_id").isUUID().optional(),
   ];
 
   const getScanInfoParam = [
@@ -168,8 +169,11 @@ function InitScanInfoRouter(scanInfoUsecase) {
   ];
 
   const listScanInfosParam = [
-    query("page").isInt().optional(),
     query("limit").isInt().optional(),
+    query("offset").isInt().optional(),
+    query("asset_id").isUUID().optional(),
+    query("scan_code").isString().optional(),
+    query("order").isIn(['oldest', 'newest', 'a-z', 'z-a', 'asset-a-z', 'asset-z-a', 'user-a-z', 'user-z-a']).optional(),
   ];
 
   const updateScanInfoParam = [
@@ -177,6 +181,7 @@ function InitScanInfoRouter(scanInfoUsecase) {
     body("scan_code").isString().optional().trim(),
     body("latitude").isFloat().optional(),
     body("longitude").isFloat().optional(),
+    body("asset_id").isUUID().optional(),
   ];
 
   const deleteScanInfoParam = [
