@@ -6,41 +6,33 @@ class UserLog extends Model {}
 UserLog.init({
   id: {
     type: DataTypes.BIGINT,
-  autoIncrement: true,
-  primaryKey: true
+    autoIncrement: true,
+    primaryKey: true
   },
   user_id: {
     type: DataTypes.UUID,
     allowNull: false,
   },
-  email: {
-    type: DataTypes.STRING(320),
-    allowNull: false,
-    unique: true,
-  },
-  gender: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-  },
-  phone: {
+  action: {
     type: DataTypes.STRING,
-    allowNull: false
-  },
-  password: {
-    type: DataTypes.TEXT,
     allowNull: false,
   },
-  name: DataTypes.STRING,
-  role_id: DataTypes.INTEGER,
-  status: {
-    type: DataTypes.INTEGER,
-    defaultValue: 1,
+  old_data: {
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
+  new_data: {
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
+  created_by: {
+    type: DataTypes.UUID,
+    allowNull: true,
   },
   created_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
   },
-  created_by: DataTypes.UUID,
 }, {
   sequelize,
   modelName: 'UserLog',
@@ -49,10 +41,6 @@ UserLog.init({
 });
 
 UserLog.associate = (models) => {
-  UserLog.belongsTo(models.Role, {
-    as: 'role',
-    foreignKey: 'role_id',
-  });
 
   UserLog.belongsTo(models.User, {
     as: 'createdBy',

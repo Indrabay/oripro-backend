@@ -17,7 +17,21 @@ class TenantAttachmentRepositoy {
     return this.tenantAttachmentModel.findAll({
       where: { tenant_id: tenantID }
     });
-  };
+  }
+
+  async deleteByTenantId(tenantId, ctx) {
+    try {
+      ctx.log?.info({ tenant_id: tenantId }, "TenantAttachmentRepository.deleteByTenantId");
+      const deleted = await this.tenantAttachmentModel.destroy({
+        where: { tenant_id: tenantId },
+        transaction: ctx.transaction
+      });
+      return deleted > 0;
+    } catch (error) {
+      ctx.log?.error({ tenant_id: tenantId }, `TenantAttachmentRepository.deleteByTenantId_error: ${error.message}`);
+      throw error;
+    }
+  }
 }
 
 module.exports = TenantAttachmentRepositoy;

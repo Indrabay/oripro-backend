@@ -80,14 +80,15 @@ class TenantUseCase {
 
         const tenantLog = {
           tenant_id: tenant.id,
-          name: tenant.name,
-          user_id: tenant.user_id,
-          contract_begin_at: tenant.contract_begin_at,
-          contract_end_at: tenant.contract_end_at,
-          rent_duration: tenant.rent_duration,
-          rent_duration_unit: tenant.rent_duration_unit,
-          status: tenant.status,
-          code: tenant.code,
+          action: 'CREATE',
+          old_data: null,
+          new_data: {
+            name: tenant.name,
+            code: tenant.code,
+            status: TenantStatusIntToStr[tenant.status], // Convert to string for log
+            rent_duration: tenant.rent_duration,
+            rent_duration_unit: DurationUnitStr[tenant.rent_duration_unit], // Convert back to string for log
+          },
           created_by: ctx.userId,
         };
 
@@ -298,21 +299,110 @@ class TenantUseCase {
     }
   }
 
-  async updateTenant(id, data) {
-    return this.tenantRepository.update(id, data);
+  async updateTenant(id, data, ctx) {
+    try {
+      ctx.log?.info({ tenant_id: id, update_data: data }, "TenantUsecase.updateTenant");
+      
+      // Get old data before update
+      const oldTenant = await this.tenantRepository.findById(id, ctx);
+      if (!oldTenant) {
+        throw new Error('Tenant not found');
+      }
+
+      // Update tenant
+      const updatedTenant = await this.tenantRepository.update(id, data);
+      
+      // Create log entry - only log changed fields
+      const changedFields = {};
+      const oldData = {};
+      
+      // Check each field for changes
+      Object.keys(data).forEach(key => {
+        if (data[key] !== undefined && data[key] !== oldTenant[key]) {
+          if (key === 'rent_duration_unit') {
+            // Convert integer to string for old data
+            oldData[key] = DurationUnitStr[oldTenant[key]];
+            // Convert string to string for new data (if it's string) or integer to string
+            changedFields[key] = typeof data[key] === 'string' ? data[key] : DurationUnitStr[data[key]];
+          } else {
+            oldData[key] = oldTenant[key];
+            changedFields[key] = data[key];
+          }
+        }
+      });
+
+      // Only create log if there are actual changes
+      if (Object.keys(changedFields).length > 0) {
+        const tenantLog = {
+          tenant_id: id,
+          action: 'UPDATE',
+          old_data: oldData,
+          new_data: changedFields,
+          created_by: ctx.userId,
+        };
+
+        await this.tenantLogRepository.create(tenantLog, ctx);
+      }
+      
+      return updatedTenant;
+    } catch (error) {
+      ctx.log?.error({ tenant_id: id, update_data: data }, `TenantUsecase.updateTenant_error: ${error.message}`);
+      throw error;
+    }
   }
 
-  async deleteTenant(id) {
-    return this.tenantRepository.delete(id);
+  async deleteTenant(id, ctx) {
+    const transaction = await sequelize.transaction();
+    try {
+      ctx.log?.info({ tenant_id: id }, "TenantUsecase.deleteTenant");
+      
+      // Get tenant data before delete
+      const tenant = await this.tenantRepository.findById(id, ctx);
+      if (!tenant) {
+        throw new Error('Tenant not found');
+      }
+
+      // Create log entry before deletion - only store essential data
+      const tenantLog = {
+        tenant_id: id,
+        action: 'DELETE',
+        old_data: {
+          name: tenant.name,
+          code: tenant.code,
+          status: TenantStatusIntToStr[tenant.status], // Convert to string for log
+        },
+        new_data: null,
+        created_by: ctx.userId,
+      };
+
+      await this.tenantLogRepository.create(tenantLog, { ...ctx, transaction });
+      
+      // Delete related data first
+      // Delete tenant units
+      await this.tenantUnitRepository.deleteByTenantId(id, { ...ctx, transaction });
+      
+      // Delete tenant attachments
+      await this.tenantAttachmentRepository.deleteByTenantId(id, { ...ctx, transaction });
+      
+      // Delete tenant category mappings
+      await this.tenantCategoryMapRepo.deleteByTenantId(id, { ...ctx, transaction });
+      
+      // Delete tenant
+      const result = await this.tenantRepository.delete(id, { ...ctx, transaction });
+      
+      await transaction.commit();
+      return result;
+    } catch (error) {
+      await transaction.rollback();
+      ctx.log?.error({ tenant_id: id }, `TenantUsecase.deleteTenant_error: ${error.message}`);
+      throw error;
+    }
   }
 
   async getTenantLogs(id, ctx) {
     ctx.log?.info({ tenant_id: id }, "TenantUsecase.getTenantLogs");
     let tenantLogs = await this.tenantLogRepository.findByTenantID(id, ctx);
-    return tenantLogs.map((tl) => {
-      tl.status = TenantStatusIntToStr[tl.status];
-      return tl;
-    });
+    return tenantLogs;
   }
 
   async tenantToJson(tenant) {

@@ -16,9 +16,17 @@ class UserRepository {
   }
 
   async findById(id, ctx = {}) {
-    ctx.log?.debug({ id }, "repo_find_user_by_id");
+    ctx.log?.debug({ id, type: typeof id }, "repo_find_user_by_id");
+    
+    // Pastikan ID adalah UUID string
+    const userId = id;
+    if (!userId || typeof userId !== 'string') {
+      ctx.log?.warn({ id }, "repo_find_user_by_id_invalid_id");
+      return null;
+    }
+    
     try {
-      const user = await this.userModel.findByPk(id, {
+      const user = await this.userModel.findByPk(userId, {
         include: [
           {
             model: this.roleModel,
@@ -37,13 +45,23 @@ class UserRepository {
           },
         ],
       });
-      return user ? user.toJSON() : null;
+      
+      if (!user) {
+        ctx.log?.warn({ userId }, "repo_find_user_by_id_not_found");
+        return null;
+      }
+      
+      ctx.log?.debug({ userId, found: true }, "repo_find_user_by_id_success");
+      return user.toJSON();
     } catch (error) {
-      ctx.log?.error({ error: error.message }, "repo_find_user_by_id_error");
+      ctx.log?.error({ error: error.message, userId }, "repo_find_user_by_id_error");
       // Fallback: get user and role separately, then join manually
       try {
-        const user = await this.userModel.findByPk(id);
-        if (!user) return null;
+        const user = await this.userModel.findByPk(userId);
+        if (!user) {
+          ctx.log?.warn({ userId }, "repo_find_user_by_id_fallback_not_found");
+          return null;
+        }
 
         const userData = user.toJSON();
 
@@ -57,10 +75,11 @@ class UserRepository {
           }
         }
 
+        ctx.log?.debug({ userId, found: true }, "repo_find_user_by_id_fallback_success");
         return userData;
       } catch (fallbackError) {
         ctx.log?.error(
-          { error: fallbackError.message },
+          { error: fallbackError.message, userId },
           "repo_find_user_by_id_fallback_error"
         );
         return null;
@@ -233,27 +252,60 @@ class UserRepository {
   }
 
   async update(id, userData, ctx = {}) {
-    ctx.log?.info({ id }, "repo_update_user");
-    const user = await this.userModel.findByPk(id);
-    if (!user) return null;
-    await user.update({
-      email: userData.email ?? user.email,
-      password: userData.password ?? user.password,
-      name: userData.name ?? user.name,
-      role_id: userData.roleId ?? user.role_id,
-      gender: userData.gender ?? user.gender,
-      phone: userData.phone ?? user.phone,
-      status: userData.status ?? user.status,
-      updated_by: userData.updatedBy ?? user.updated_by,
-      updated_at: new Date(),
-    });
-    return user.toJSON();
+    ctx.log?.info({ id, type: typeof id }, "repo_update_user");
+    
+    // Pastikan ID adalah UUID string
+    const userId = id;
+    if (!userId || typeof userId !== 'string') {
+      ctx.log?.warn({ id }, "repo_update_user_invalid_id");
+      return null;
+    }
+    
+    const user = await this.userModel.findByPk(userId);
+    if (!user) {
+      ctx.log?.warn({ userId }, "repo_update_user_not_found");
+      return null;
+    }
+    
+    try {
+      await user.update({
+        email: userData.email ?? user.email,
+        password: userData.password ?? user.password,
+        name: userData.name ?? user.name,
+        role_id: userData.roleId ?? user.role_id,
+        gender: userData.gender ?? user.gender,
+        phone: userData.phone ?? user.phone,
+        status: userData.status ?? user.status,
+        updated_by: userData.updatedBy ?? user.updated_by,
+        updated_at: new Date(),
+      });
+      
+      ctx.log?.debug({ userId }, "repo_update_user_success");
+      return user.toJSON();
+    } catch (error) {
+      ctx.log?.error({ error: error.message, userId }, "repo_update_user_error");
+      throw error;
+    }
   }
 
   async delete(id, ctx = {}) {
-    ctx.log?.info({ id }, "repo_delete_user");
-    const deleted = await this.userModel.destroy({ where: { id } });
-    return deleted > 0;
+    ctx.log?.info({ id, type: typeof id }, "repo_delete_user");
+    
+    // Pastikan ID adalah UUID string
+    const userId = id;
+    if (!userId || typeof userId !== 'string') {
+      ctx.log?.warn({ id }, "repo_delete_user_invalid_id");
+      return false;
+    }
+    
+    try {
+      const deleted = await this.userModel.destroy({ where: { id: userId } });
+      ctx.log?.debug({ userId, deleted }, "repo_delete_user_result");
+      return deleted > 0;
+    } catch (error) {
+      ctx.log?.error({ error: error.message, userId }, "repo_delete_user_error");
+      throw error;
+    }
   }
 
   async getUserPermissions(userId, ctx = {}) {

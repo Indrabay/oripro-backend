@@ -4,26 +4,20 @@ class AssetLogRepository {
     this.userModel = userModel;
   }
 
-  async create({ id, name, description, asset_type, code, address, area, status, longitude, latitude, is_deleted }, ctx = {}, tx = null) {
-    ctx.log?.info({id, is_deleted}, 'AssetLogRepository.create');
-    await this.assetLogModel.create({
-      asset_id: id,
-      name,
-      description,
-      asset_type,
-      code,
-      address,
-      area,
-      status,
-      longitude,
-      latitude,
-      is_deleted,
-      created_by: ctx.userID
-    }, { transaction: tx});
+  async create(data, ctx) {
+    try {
+      ctx.log?.info(data, "AssetLogRepository.create");
+      await this.assetLogModel.create(data, {
+        transaction: ctx.transaction
+      });
+    } catch (error) {
+      ctx.log?.error(data, "AssetLogRepository.create_error");
+      throw new Error(`error when create asset log. with err: ${error.message}`);
+    }
   }
 
-  async getByAssetID(id, ctx = {}) {
-    ctx.log?.info({asset_id: id}, 'AssetLogRepository.getByAssetID');
+  async findByAssetID(id, ctx) {
+    ctx.log?.info({asset_id: id}, "AssetLogRepository.findByAssetID");
     const assetLogs = await this.assetLogModel.findAll({
       where: { asset_id: id },
       order: [['created_at', 'DESC']],

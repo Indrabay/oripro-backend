@@ -14,8 +14,8 @@ const DurationUnitStr = {
 }
 
 const TenantStatusStrToInt = {
-  'active': 1,
   'inactive': 0,
+  'active': 1,
   'pending': 2,
   'expired': 3,
   'terminated': 4,
@@ -64,7 +64,8 @@ Tenant.init({
   },
   status: {
     type: DataTypes.INTEGER,
-    defaultValue: 1,
+    defaultValue: 2, // pending
+    comment: 'Status: 0=inactive, 1=active, 2=pending, 3=expired, 4=terminated, 5=blacklisted'
   },
   code: {
     type: DataTypes.STRING,
