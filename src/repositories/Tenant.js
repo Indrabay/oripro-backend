@@ -109,8 +109,37 @@ class TenantRepository {
   async update(id, data) {
     const tenant = await this.tenantModel.findByPk(id);
     if (!tenant) return null;
-    await tenant.update(data);
+    
+    // Convert rent_duration_unit from string to integer if needed
+    const updateData = { ...data };
+    if (updateData.rent_duration_unit && typeof updateData.rent_duration_unit === 'string') {
+      const { DurationUnit } = require('../models/Tenant');
+      updateData.rent_duration_unit = DurationUnit[updateData.rent_duration_unit];
+    }
+    
+    await tenant.update(updateData);
     return tenant;
+  }
+
+  async delete(id, ctx) {
+    try {
+      ctx.log?.info({ tenant_id: id }, "TenantRepository.delete");
+      
+      const tenant = await this.tenantModel.findByPk(id, {
+        transaction: ctx.transaction
+      });
+      if (!tenant) {
+        throw new Error('Tenant not found');
+      }
+      
+      await tenant.destroy({
+        transaction: ctx.transaction
+      });
+      return true;
+    } catch (error) {
+      ctx.log?.error({ tenant_id: id }, `TenantRepository.delete_error: ${error.message}`);
+      throw error;
+    }
   }
 }
 

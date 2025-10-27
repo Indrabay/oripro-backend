@@ -37,4 +37,17 @@ UserAsset.init({
   ],
 })
 
+// Define associations
+UserAsset.associate = (models) => {
+  UserAsset.belongsTo(models.Asset, {
+    as: 'asset',
+    foreignKey: 'asset_id'
+  });
+  
+  UserAsset.belongsTo(models.User, {
+    as: 'user',
+    foreignKey: 'user_id'
+  });
+};
+
 module.exports = UserAsset;

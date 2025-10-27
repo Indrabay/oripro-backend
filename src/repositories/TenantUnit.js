@@ -18,6 +18,20 @@ class TenantUnitRepository {
       where: { tenant_id: id }
     })
   }
+
+  async deleteByTenantId(tenantId, ctx) {
+    try {
+      ctx.log?.info({ tenant_id: tenantId }, "TenantUnitRepository.deleteByTenantId");
+      const deleted = await this.tenantUnitModel.destroy({
+        where: { tenant_id: tenantId },
+        transaction: ctx.transaction
+      });
+      return deleted > 0;
+    } catch (error) {
+      ctx.log?.error({ tenant_id: tenantId }, `TenantUnitRepository.deleteByTenantId_error: ${error.message}`);
+      throw error;
+    }
+  }
 }
 
 module.exports = TenantUnitRepository;

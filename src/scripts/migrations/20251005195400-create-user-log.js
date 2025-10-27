@@ -1,4 +1,4 @@
-// Migration for User model
+// Migration for User Log model
 'use strict';
 
 module.exports = {
@@ -11,34 +11,25 @@ module.exports = {
       },
       user_id: {
         type: Sequelize.UUID,
-        allowNull: false,
+        allowNull: true,
       },
-      email: {
-        type: Sequelize.STRING(320),
-        allowNull: false,
-      },
-      phone: {
+      action: {
         type: Sequelize.STRING,
         allowNull: false,
       },
-      gender: {
-        type: Sequelize.INTEGER,
-        allowNull: false,
+      old_data: {
+        type: Sequelize.JSON,
+        allowNull: true,
       },
-      password: {
-        type: Sequelize.TEXT,
-        allowNull: false,
+      new_data: {
+        type: Sequelize.JSON,
+        allowNull: true,
       },
-      name: Sequelize.STRING,
-      role_id: {
-        type: Sequelize.INTEGER,
-        references: { model: 'roles', key: 'id' },
+      created_by: {
+        type: Sequelize.UUID,
+        allowNull: true,
+        references: { model: 'users', key: 'id' },
       },
-      status: {
-        type: Sequelize.INTEGER,
-        defaultValue: 1,
-      },
-      created_by: Sequelize.UUID,
       created_at: {
         type: Sequelize.DATE,
         defaultValue: Sequelize.NOW,

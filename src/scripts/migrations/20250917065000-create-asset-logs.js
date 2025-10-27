@@ -13,21 +13,29 @@ module.exports = {
         type: Sequelize.UUID,
         allowNull: false,
       },
-      name: Sequelize.STRING,
-      code: Sequelize.STRING(100),
-      description: Sequelize.TEXT,
-      asset_type: Sequelize.INTEGER,
-      status: Sequelize.INTEGER,
-      address: Sequelize.STRING(500),
-      area: Sequelize.DECIMAL(10,2),
-      longitude: Sequelize.DOUBLE,
-      latitude: Sequelize.DOUBLE,
-      is_deleted: Sequelize.BOOLEAN,
+      action: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        comment: 'Action: CREATE, UPDATE, DELETE'
+      },
+      old_data: {
+        type: Sequelize.JSON,
+        allowNull: true,
+        comment: 'Previous data before change'
+      },
+      new_data: {
+        type: Sequelize.JSON,
+        allowNull: true,
+        comment: 'New data after change'
+      },
+      created_by: {
+        type: Sequelize.UUID,
+        allowNull: true,
+      },
       created_at: {
         type: Sequelize.DATE,
         defaultValue: Sequelize.NOW,
       },
-      created_by: Sequelize.UUID,
     });
     await queryInterface.addIndex('asset_logs', ['asset_id']);
   },

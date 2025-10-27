@@ -1,3 +1,4 @@
+// Migration for Tenant Log model
 'use strict';
 
 module.exports = {
@@ -6,41 +7,29 @@ module.exports = {
       id: {
         type: Sequelize.BIGINT,
         autoIncrement: true,
-        primaryKey: true
+        primaryKey: true,
       },
       tenant_id: {
         type: Sequelize.UUID,
         allowNull: false,
       },
-      name: {
+      action: {
         type: Sequelize.STRING,
         allowNull: false,
-        unique: true,
       },
-      user_id: {
+      old_data: {
+        type: Sequelize.JSON,
+        allowNull: true,
+      },
+      new_data: {
+        type: Sequelize.JSON,
+        allowNull: true,
+      },
+      created_by: {
         type: Sequelize.UUID,
-        allowNull: false,
+        allowNull: true,
+        references: { model: 'users', key: 'id' },
       },
-      contract_begin_at: {
-        type: Sequelize.DATE,
-        allowNull: false
-      },
-      contract_end_at: {
-        type: Sequelize.DATE,
-        allowNull: false,
-      },
-      code: {
-        type:Sequelize.STRING,
-        unique: true,
-        allowNull: false,
-      },
-      status: {
-        type: Sequelize.INTEGER,
-        defaultValue: 1,
-      },
-      rent_duration: Sequelize.INTEGER,
-      rent_duration_unit: Sequelize.INTEGER,
-      created_by: Sequelize.UUID,
       created_at: {
         type: Sequelize.DATE,
         defaultValue: Sequelize.NOW,
@@ -50,4 +39,4 @@ module.exports = {
   down: async (queryInterface) => {
     await queryInterface.dropTable('tenant_logs');
   },
-}
+};

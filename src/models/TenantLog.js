@@ -7,49 +7,27 @@ TenantLog.init({
   id: {
     type: DataTypes.BIGINT,
     autoIncrement: true,
-    primaryKey: true
+    primaryKey: true,
   },
   tenant_id: {
     type: DataTypes.UUID,
     allowNull: false,
   },
-  name: {
+  action: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true,
   },
-  user_id: {
-    type: DataTypes.UUID,
-    allowNull: false,
+  old_data: {
+    type: DataTypes.JSON,
+    allowNull: true,
   },
-  contract_begin_at: {
-    type: DataTypes.DATE,
-    allowNull: false
-  },
-  contract_end_at: {
-    type: DataTypes.DATE,
-    allowNull: false
-  },
-  rent_duration: {
-    type: DataTypes.INTEGER,
-    allowNull: false
-  },
-  rent_duration_unit: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-  },
-  status: {
-    type: DataTypes.INTEGER,
-    defaultValue: 1,
-  },
-  code: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    unique: true,
+  new_data: {
+    type: DataTypes.JSON,
+    allowNull: true,
   },
   created_by: {
     type: DataTypes.UUID,
-    allowNull: true
+    allowNull: true,
   },
   created_at: {
     type: DataTypes.DATE,
@@ -67,10 +45,6 @@ TenantLog.associate = (models) => {
     foreignKey: 'created_by',
     as: 'createdBy',
   });
-  TenantLog.belongsTo(models.User, {
-    foreignKey: 'user_id',
-    as: 'user'
-  })
 }
 
 module.exports = TenantLog;

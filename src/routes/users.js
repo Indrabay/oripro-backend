@@ -87,23 +87,31 @@ function InitUserRouter(userUsecase, userAccessMenuUsecase) {
     }
   };
 
-  const getDetailUserParam = [param("id").isString().notEmpty()];
+  const getDetailUserParam = [param("id").isUUID().withMessage("ID must be a valid UUID")];
   const getDetailUser = async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty())
       return res.status(400).json(createResponse(null, "bad request", 400, false, {}, errors));
-    req.log?.info({ id: req.params.id }, "UserRouter.getDetailUser");
+    
+    const userId = req.params.id;
+    req.log?.info({ id: userId }, "UserRouter.getDetailUser");
+    
     try {
-      const user = await userUsecase.getUser(req.params.id, {
+      const user = await userUsecase.getUser(userId, {
         requestId: req.requestId,
         log: req.log,
         roleName: req.auth.roleName,
       });
-      if (!user) return res.status(404).json(createResponse(null, "User not found", 400));
-      user.status = UserStatusIntToStr[user.status]
+      console.log(user)
+      if (!user) {
+        req.log?.warn({ userId }, "UserRouter.getDetailUser_not_found");
+        return res.status(404).json(createResponse(null, "User not found", 404));
+      }
+      
+      user.status = UserStatusIntToStr[user.status];
       return res.status(200).json(createResponse(user, "success", 200));
     } catch (error) {
-      req.log?.error({ error: error.message }, "UserRouter.getDetailUser_error");
+      req.log?.error({ error: error.message, stack: error.stack }, "UserRouter.getDetailUser_error");
       return res.status(500).json(createResponse(null, "Internal Server Error", 500));
     }
   };
@@ -144,7 +152,7 @@ function InitUserRouter(userUsecase, userAccessMenuUsecase) {
   };
 
   const updateUserParam = [
-    param("id").isString().notEmpty(),
+    param("id").isUUID().withMessage("ID must be a valid UUID"),
     body("email").optional().isEmail().normalizeEmail(),
     body("name").optional().isString().notEmpty(),
     body("gender").optional().isString().isIn(["male", "female"]),
@@ -161,9 +169,14 @@ function InitUserRouter(userUsecase, userAccessMenuUsecase) {
     if (!errors.isEmpty())
       return res.status(400).json(createResponse(null, "bad request", 400, false, {}, errors));
     try {
-      req.log?.info({ id: req.params.id, body: req.body }, "UserRouter.updateUser");
+      const userId = req.params.id;
+      req.log?.info({ id: userId, body: req.body }, "UserRouter.updateUser");
+      
+      // Log untuk debugging
+      req.log?.info({ userId, type: typeof userId }, "UserRouter.updateUser_debug");
+      
       const updatedUser = await userUsecase.updateUser(
-        req.params.id,
+        userId,
         req.body,
         {
           requestId: req.requestId,
@@ -171,39 +184,100 @@ function InitUserRouter(userUsecase, userAccessMenuUsecase) {
           userId: req.auth.userId,
         }
       );
-      if (!updatedUser)
-        return res.status(404).json(createResponse(null, "User not found", 404 ));
+      
+      if (!updatedUser) {
+        req.log?.warn({ userId }, "UserRouter.updateUser_user_not_found");
+        return res.status(404).json(createResponse(null, "User not found", 404));
+      }
+      
       if (updatedUser === "exists")
         return res
           .status(409)
-          .json(createResponse(null, "User with this email already exists", 409 ));
+          .json(createResponse(null, "User with this email already exists", 409));
+          
       return res.status(202).json(createResponse(updatedUser, "success", 202));
     } catch (error) {
-      req.log?.error({ error: error.message }, "UserRouter.updateUser_error");
-      return res.status(500).json(createResponse(null,   "Internal Server Error", 500 ));
+      req.log?.error({ error: error.message, stack: error.stack }, "UserRouter.updateUser_error");
+      return res.status(500).json(createResponse(null, "Internal Server Error", 500));
     }
   };
 
   const getUserLogParam = [
-    param("id").isString().notEmpty()
+    param("id").isUUID().withMessage("ID must be a valid UUID")
   ]
 
   const getUserLogs = async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty())
-      return res.status(400).json(createResponse(null, "bad request", 400, false, {}, errors ));
-    req.log?.info({ id: req.params.id }, "UserRouter.getUserLogs");
+      return res.status(400).json(createResponse(null, "bad request", 400, false, {}, errors));
+    
+    const userId = req.params.id;
+    req.log?.info({ id: userId }, "UserRouter.getUserLogs");
+    
     try {
-      const userLogs = await userUsecase.getUserLogs(req.params.id, {
+      req.log?.info({ userId }, "UserRouter.getUserLogs_calling_usecase");
+      const userLogs = await userUsecase.getUserLogs(userId, {
+        requestId: req.requestId,
+        log: req.log,
+        roleName: req.auth.roleName,
+        userId: req.auth.userId
+      });
+      
+      req.log?.info({ userId, logsCount: userLogs?.length || 0 }, "UserRouter.getUserLogs_usecase_result");
+      
+      if (!userLogs || userLogs.length === 0) {
+        req.log?.warn({ userId }, "UserRouter.getUserLogs_not_found");
+        return res.status(200).json(createResponse([], "success", 200, true, {
+          total: 0, 
+          limit: 0, 
+          offset: 0
+        }));
+      }
+      
+      req.log?.info({ userId, logsCount: userLogs.length }, "UserRouter.getUserLogs_success");
+      return res.status(200).json(createResponse(userLogs, "success", 200, true, {
+        total: userLogs.length, 
+        limit: userLogs.length, 
+        offset: 0
+      }));
+    } catch (error) {
+      req.log?.error({ error: error.message, stack: error.stack }, "UserRouter.getUserLogs_error");
+      return res.status(500).json(createResponse(null, "Internal Server Error", 500));
+    }
+  }
+
+  const getUserAssetsParam = [
+    param("id").isUUID().withMessage("ID must be a valid UUID")
+  ]
+
+  const getUserAssets = async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty())
+      return res.status(400).json(createResponse(null, "bad request", 400, false, {}, errors));
+    
+    const userId = req.params.id;
+    req.log?.info({ id: userId }, "UserRouter.getUserAssets");
+    
+    try {
+      const userAssets = await userUsecase.getUserAssets(userId, {
         requestId: req.requestId,
         log: req.log,
         roleName: req.auth.roleName,
       });
-      if (!userLogs) return res.status(404).json(createResponse(null, "User logs not found", 404));
-      return res.status(200).json(createResponse(userLogs, "success", 200, true, {total: userLogs.length, limit: userLogs.length, offset: 0}));
+      
+      if (!userAssets) {
+        req.log?.warn({ userId }, "UserRouter.getUserAssets_not_found");
+        return res.status(404).json(createResponse(null, "User assets not found", 404));
+      }
+      
+      return res.status(200).json(createResponse(userAssets, "success", 200, true, {
+        total: userAssets.length, 
+        limit: userAssets.length, 
+        offset: 0
+      }));
     } catch (error) {
-      req.log?.error({ error: error.message }, "UserRouter.getUserLogs");
-      return res.status(500).json({ message: "Internal Server Error" });
+      req.log?.error({ error: error.message, stack: error.stack }, "UserRouter.getUserAssets_error");
+      return res.status(500).json(createResponse(null, "Internal Server Error", 500));
     }
   }
   router.use(authMiddleware, ensureRole);
@@ -216,39 +290,50 @@ function InitUserRouter(userUsecase, userAccessMenuUsecase) {
   router.get("/menus", getUserMenu);
   // GET /api/users/sidebar - Get user accessible sidebar
   router.get("/sidebar", getUserSidebar);
+  // GET /api/users/:id/logs - Get user logs (must be before /:id route)
+  router.get("/:id/logs", getUserLogParam, getUserLogs);
+  // GET /api/users/:id/assets - Get user assets (must be before /:id route)
+  router.get("/:id/assets", getUserAssetsParam, getUserAssets);
   // GET /api/users/:id - Get user by ID
   router.get("/:id", getDetailUserParam, getDetailUser);
   // POST /api/users - Create new user
   router.post("/", createUserParam, createUser);
   // PUT /api/users/:id - Update user
   router.put("/:id", updateUserParam, updateUser);
-  router.get("/:id/logs", getUserLogParam, getUserLogs);
 
   // DELETE /api/users/:id - Delete user
   router.delete(
     "/:id",
-    [param("id").isString().notEmpty()],
+    [param("id").isUUID().withMessage("ID must be a valid UUID")],
     async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty())
-        return res.status(400).json({ errors: errors.array() });
-      req.log?.info({ id: req.params.id }, "route_users_delete");
+        return res.status(400).json(createResponse(null, "bad request", 400, false, {}, errors));
+      
+      const userId = req.params.id;
+      req.log?.info({ id: userId }, "route_users_delete");
+      
       try {
-        const deleted = await userUsecase.deleteUser(req.params.id, {
+        const deleted = await userUsecase.deleteUser(userId, {
           requestId: req.requestId,
           log: req.log,
           userId: req.auth.userId,
         });
-        if (!deleted)
-          return res.status(404).json({ message: "User not found" });
+        
+        if (!deleted) {
+          req.log?.warn({ userId }, "route_users_delete_not_found");
+          return res.status(404).json(createResponse(null, "User not found", 404));
+        }
+        
         if (deleted === "self")
           return res
             .status(400)
-            .json({ message: "Cannot delete your own account" });
+            .json(createResponse(null, "Cannot delete your own account", 400));
+            
         return res.status(204).send();
       } catch (error) {
-        req.log?.error({ error: error.message }, "route_users_delete_error");
-        return res.status(500).json({ message: "Internal Server Error" });
+        req.log?.error({ error: error.message, stack: error.stack }, "route_users_delete_error");
+        return res.status(500).json(createResponse(null, "Internal Server Error", 500));
       }
     }
   );
