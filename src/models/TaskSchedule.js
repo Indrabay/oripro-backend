@@ -31,4 +31,15 @@ TaskSchedule.init({
   timestamps: false,
 });
 
+TaskSchedule.associate = (models) => {
+  TaskSchedule.belongsTo(models.Task, {
+    foreignKey: 'task_id',
+    as: 'task',
+  });
+  TaskSchedule.belongsTo(models.User, {
+    foreignKey: 'created_by',
+    as: 'createdBy',
+  });
+};
+
 module.exports = TaskSchedule;

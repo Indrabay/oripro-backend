@@ -71,6 +71,7 @@ class ScanInfoUsecase {
       if (data.scan_code !== undefined) updateData.scan_code = data.scan_code;
       if (data.latitude !== undefined) updateData.latitude = data.latitude;
       if (data.longitude !== undefined) updateData.longitude = data.longitude;
+      if (data.asset_id !== undefined) updateData.asset_id = data.asset_id;
 
       const updatedScanInfo = await this.scanInfoRepository.update(id, updateData, ctx);
       return updatedScanInfo;

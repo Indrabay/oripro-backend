@@ -71,6 +71,10 @@ Task.associate = (models) => {
     foreignKey: 'role_id',
     as: 'role',
   });
+  Task.hasMany(models.TaskSchedule, {
+    foreignKey: 'task_id',
+    as: 'schedules',
+  });
 }
 
 module.exports = Task;

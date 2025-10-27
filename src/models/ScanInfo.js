@@ -30,6 +30,10 @@ ScanInfo.init({
     type: DataTypes.UUID,
     allowNull: true,
   },
+  asset_id: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
   created_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
@@ -45,6 +49,7 @@ ScanInfo.init({
   timestamps: false,
   indexes: [
     { fields: ['scan_code'] },
+    { fields: ['asset_id'] },
   ],
 });
 
@@ -56,6 +61,10 @@ ScanInfo.associate = (models) => {
   ScanInfo.belongsTo(models.User, {
     foreignKey: 'updated_by',
     as: 'updatedBy',
+  });
+  ScanInfo.belongsTo(models.Asset, {
+    foreignKey: 'asset_id',
+    as: 'asset',
   });
 };
 
