@@ -13,10 +13,12 @@ const asset = require('./routes/assets');
 const user = require('./routes/users');
 const units = require('./routes/units');
 const tenant = require('./routes/tenants');
+const taskRoute = require('./routes/tasks');
 const uploadsRouter = require('./routes/uploads');
 const { InitAttendanceRouter } = require('./routes/attendances');
 const { InitRoleRouter } = require('./routes/roles');
 const { InitMenuRouter } = require('./routes/menus');
+const { InitScanInfoRouter } = require('./routes/scanInfos');
 const { requestContext } = require('./middleware/requestContext');
 const { metricsMiddleware, metricsHandler } = require('./services/metrics');
 
@@ -42,6 +44,12 @@ const UnitLogRepository = require('./repositories/UnitLog');
 const TenantLogRepository = require('./repositories/TenantLog');
 const AttendanceRepository = require('./repositories/Attendance');
 const UserAssetRepository = require('./repositories/UserAsset');
+const TaskRepository = require('./repositories/Task');
+const TaskScheduleRepository = require('./repositories/TaskSchedule');
+const TaskLogRepository = require('./repositories/TaskLog');
+const ScanInfoRepository = require('./repositories/ScanInfo');
+const UserTaskRepository = require('./repositories/UserTask');
+const UserTaskEvidenceRepository = require('./repositories/UserTaskEvidence');
 
 // define usecase module
 const authUc = require('./usecases/Auth');
@@ -52,6 +60,9 @@ const tenantUc = require('./usecases/Tenant');
 const roleUc = require('./usecases/Role');
 const menuUc = require('./usecases/Menu');
 const userAccessMenuUc = require('./usecases/UserAccessMenu');
+const taskUc = require('./usecases/Task');
+const userTaskUc = require('./usecases/UserTask');
+const scanInfoUc = require('./usecases/ScanInfo');
 const attendanceUc = require('./usecases/Attendance');
 
 // define models database
@@ -75,6 +86,12 @@ const modelUserLog = require('./models/UserLog');
 const modelUnitLog = require('./models/UnitLog');
 const modelTenantLog = require('./models/TenantLog');
 const modelUserAsset = require('./models/UserAsset');
+const modelTask = require('./models/Task');
+const modelTaskSchedule = require('./models/TaskSchedule');
+const modelTaskLog = require('./models/TaskLog');
+const modelScanInfo = require('./models/ScanInfo');
+const modelUserTask = require('./models/UserTask');
+const modelUserTaskEvidence = require('./models/UserTaskEvidence');
 
 // initialize repository
 const userRepository = new UserRepository(User, modelRole);
@@ -96,6 +113,12 @@ const userLogRepository = new UserLogRepository(modelUserLog, User, modelRole)
 const unitLogRepository = new UnitLogRepository(modelUnitLog, User)
 const tenantLogRepository = new TenantLogRepository(modelTenantLog, User);
 const userAssetRepository = new UserAssetRepository(modelUserAsset);
+const taskRepository = new TaskRepository(modelTask, User, modelRole, Asset);
+const taskScheduleRepository = new TaskScheduleRepository(modelTaskSchedule);
+const taskLogRepository = new TaskLogRepository(modelTaskLog, User);
+const scanInfoRepository = new ScanInfoRepository(modelScanInfo, User, Asset);
+const userTaskRepository = new UserTaskRepository(modelUserTask, User, modelTask, modelUserTaskEvidence, modelTaskSchedule);
+const userTaskEvidenceRepository = new UserTaskEvidenceRepository(modelUserTaskEvidence, modelUserTask);
 
 // Setup model associations
 const models = {
@@ -119,6 +142,12 @@ const models = {
   UnitLog: modelUnitLog,
   TenantLog: modelTenantLog,
   UserAsset: modelUserAsset,
+  Task: modelTask,
+  TaskSchedule: modelTaskSchedule,
+  TaskLog: modelTaskLog,
+  ScanInfo: modelScanInfo,
+  UserTask: modelUserTask,
+  UserTaskEvidence: modelUserTaskEvidence,
 };
 
 // Setup associations
@@ -145,6 +174,9 @@ const tenantUsecase = new tenantUc(tenantRepository, tenantAttachmentRepository,
 const roleUsecase = new roleUc(roleRepository);
 const menuUsecase = new menuUc(menuRepository);
 const userAccessMenuUsecase = new userAccessMenuUc(userAccessMenuRepository);
+const taskUsecase = new taskUc(taskRepository, taskScheduleRepository, taskLogRepository);
+const userTaskUsecase = new userTaskUc(userTaskRepository, taskRepository, taskScheduleRepository, userTaskEvidenceRepository);
+const scanInfoUsecase = new scanInfoUc(scanInfoRepository);
 const attendanceRepository = new AttendanceRepository();
 const attendanceUsecase = new attendanceUc(attendanceRepository);
 
@@ -158,6 +190,9 @@ const roleRouter = InitRoleRouter(roleUsecase);
 const menuRouter = InitMenuRouter(menuUsecase);
 const attendanceRouter = InitAttendanceRouter(attendanceUsecase);
 const uploadFileRouter = uploadsRouter.InitUploadRouter();
+const taskRouter = taskRoute.InitTaskRouter(taskUsecase);
+const scanInfoRouter = InitScanInfoRouter(scanInfoUsecase);
+const userTaskRouter = require('./routes/userTasks').InitUserTaskRouter(userTaskUsecase);
 
 // Middleware
 app.use(helmet());
@@ -208,9 +243,13 @@ app.use('/api/assets', assetRouter);
 app.use('/api/users', userRouter);
 app.use('/api/units', unitRouter);
 app.use('/api/tenants', tenantRouter);
+app.use('/api/tasks', taskRouter);
 app.use('/api/roles', roleRouter);
 app.use('/api/menus', menuRouter);
 app.use('/api/uploads', uploadFileRouter);
+app.use('/api/scan-infos', scanInfoRouter);
+app.use('/api/user-tasks', userTaskRouter);
+
 app.use('/api/attendances', attendanceRouter);
 app.get('/metrics', metricsHandler);
 
