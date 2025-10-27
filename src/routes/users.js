@@ -215,17 +215,26 @@ function InitUserRouter(userUsecase, userAccessMenuUsecase) {
     req.log?.info({ id: userId }, "UserRouter.getUserLogs");
     
     try {
+      req.log?.info({ userId }, "UserRouter.getUserLogs_calling_usecase");
       const userLogs = await userUsecase.getUserLogs(userId, {
         requestId: req.requestId,
         log: req.log,
         roleName: req.auth.roleName,
+        userId: req.auth.userId
       });
       
-      if (!userLogs) {
+      req.log?.info({ userId, logsCount: userLogs?.length || 0 }, "UserRouter.getUserLogs_usecase_result");
+      
+      if (!userLogs || userLogs.length === 0) {
         req.log?.warn({ userId }, "UserRouter.getUserLogs_not_found");
-        return res.status(404).json(createResponse(null, "User logs not found", 404));
+        return res.status(200).json(createResponse([], "success", 200, true, {
+          total: 0, 
+          limit: 0, 
+          offset: 0
+        }));
       }
       
+      req.log?.info({ userId, logsCount: userLogs.length }, "UserRouter.getUserLogs_success");
       return res.status(200).json(createResponse(userLogs, "success", 200, true, {
         total: userLogs.length, 
         limit: userLogs.length, 

@@ -14,21 +14,26 @@ AssetLog.init({
     type: DataTypes.UUID,
     allowNull: false,
   },
-  name: DataTypes.STRING,
-  code: DataTypes.STRING(100),
-  description: DataTypes.TEXT,
-  asset_type: DataTypes.INTEGER,
-  status: DataTypes.INTEGER,
-  address: DataTypes.STRING(100),
-  area: DataTypes.DECIMAL(10,2),
-  longitude: DataTypes.DOUBLE,
-  latitude: DataTypes.DOUBLE,
-  is_deleted: DataTypes.BOOLEAN,
+  action: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  old_data: {
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
+  new_data: {
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
+  created_by: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
   created_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
   },
-  created_by: DataTypes.UUID
 }, {
   sequelize,
   modelName: 'AssetLog',

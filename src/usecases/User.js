@@ -217,7 +217,13 @@ class UserUsecase {
     console.log("delete user")
     
     //Remove user log
-    await this.userLogRepository.remove(user.id, ctx);
+    await this.userLogRepository.create({
+      user_id: user.id,
+      action: 'delete',
+      old_data: null,
+      new_data: null,
+      created_by: ctx.userId,
+    }, ctx);
 
     // Remove all user assets before deleting user
     await this.userAssetRepository.remove({
@@ -251,12 +257,30 @@ class UserUsecase {
 
   async getUserLogs(userId, ctx) {
     ctx.log?.info({ userId }, "UserUsecase.getUserLogs");
-    const userLogs = await this.userLogRepository.getByUserID(userId, ctx);
-    return userLogs.map((ul) => {
-      ul.created_by = ul.createdBy;
-      delete ul.createdBy;
-      return ul;
-    });
+    
+    try {
+      ctx.log?.info({ userId }, "UserUsecase.getUserLogs_calling_repository");
+      const userLogs = await this.userLogRepository.getByUserID(userId, ctx);
+      
+      ctx.log?.info({ userId, logsCount: userLogs?.length || 0 }, "UserUsecase.getUserLogs_repository_result");
+      
+      if (!userLogs || userLogs.length === 0) {
+        ctx.log?.warn({ userId }, "UserUsecase.getUserLogs_no_logs");
+        return [];
+      }
+      
+      const mappedLogs = userLogs.map((ul) => {
+        ul.created_by = ul.createdBy;
+        delete ul.createdBy;
+        return ul;
+      });
+      
+      ctx.log?.info({ userId, mappedLogsCount: mappedLogs.length }, "UserUsecase.getUserLogs_mapped_result");
+      return mappedLogs;
+    } catch (error) {
+      ctx.log?.error({ userId, error: error.message }, "UserUsecase.getUserLogs_error");
+      throw error;
+    }
   }
 
   async getUserAssets(userId, ctx) {

@@ -17,7 +17,7 @@ function InitUnitRouter(UnitUsecase) {
       body('size').isFloat().notEmpty(),
       body('lamp').optional().isNumeric(),
       body('rent_price').notEmpty().isFloat(),
-      body('electrical_socket').optional().isNumeric(),
+      body('electric_socket').optional().isNumeric(),
       body('electrical_power').notEmpty().isNumeric(),
       body('electrical_unit').optional().isString(),
       body('is_toilet_exist').notEmpty().isBoolean(),
@@ -26,7 +26,7 @@ function InitUnitRouter(UnitUsecase) {
     async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-      const { name, asset_id, size, rent_price, lamp, electrical_socket, electrical_power, electrical_unit, is_toilet_exist, description, photos } = req.body;
+      const { name, asset_id, size, rent_price, lamp, electric_socket, electrical_power, electrical_unit, is_toilet_exist, description, photos } = req.body;
       req.log?.info({ name }, 'route_units_create');
       const unit = await UnitUsecase.createUnit({
         name,
@@ -34,7 +34,7 @@ function InitUnitRouter(UnitUsecase) {
         description,
         lamp,
         rent_price,
-        electrical_socket,
+        electric_socket,
         electrical_power,
         electrical_unit,
         is_toilet_exist,
@@ -90,7 +90,7 @@ function InitUnitRouter(UnitUsecase) {
       body('size').optional().isFloat().notEmpty(),
       body('rent_price').optional().isFloat().notEmpty(),
       body('lamp').optional().isNumeric(),
-      body('electrical_socket').optional().isNumeric(),
+      body('electric_socket').optional().isNumeric(),
       body('electrical_power').optional().isNumeric(),
       body('electrical_unit').optional().isString(),
       body('is_toilet_exist').optional().isBoolean(),
@@ -99,7 +99,7 @@ function InitUnitRouter(UnitUsecase) {
     async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json(createResponse(null, "bad request", 400, false, {}, errors));
-      const { name, size, rent_price, lamp, electrical_socket, electrical_power, electrical_unit, is_toilet_exist, description } = req.body;
+      const { name, size, rent_price, lamp, electric_socket, electrical_power, electrical_unit, is_toilet_exist, description } = req.body;
       req.log?.info({ id: req.params.id }, 'route_units_update');
       try {
         const unit = await UnitUsecase.updateUnit(req.params.id, {
@@ -107,7 +107,7 @@ function InitUnitRouter(UnitUsecase) {
           size,
           rent_price,
           lamp,
-          electrical_socket,
+          electric_socket,
           electrical_power,
           electrical_unit,
           is_toilet_exist,
@@ -142,14 +142,28 @@ function InitUnitRouter(UnitUsecase) {
   );
 
   router.get("/:id/logs", async (req, res) => {
-    req.log?.info({ id: req.params.id }, 'UnitRouter.getLogs');
-    const unitLogs = await UnitUsecase.getUnitLogs(req.params.id, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName });
+    try {
+      req.log?.info({ id: req.params.id }, 'UnitRouter.getLogs 1 ');
+      const unitLogs = await UnitUsecase.getUnitLogs(req.params.id, { 
+        requestId: req.requestId, 
+        log: req.log, 
+        roleName: req.auth.roleName,
+        userId: req.auth.userId
+      });
 
-    return res.status(200).json(createResponse(unitLogs, "success", 200, true, {
-      total: unitLogs.length,
-      limit: unitLogs.length,
-      offset: 0
-    }));
+      req.log?.info({ id: req.params.id, logsCount: unitLogs.length }, 'UnitRouter.getLogs_success');
+
+      return res.status(200).json(createResponse(unitLogs, "success", 200, true, {
+        total: unitLogs.length,
+        limit: unitLogs.length,
+        offset: 0
+      }));
+    } catch (error) {
+      req.log?.error({ id: req.params.id, error: error.message }, 'UnitRouter.getLogs_error');
+      return res.status(500).json(createResponse(null, "Internal server error", 500, false, {
+        error: error.message
+      }));
+    }
   })
 
   return router;

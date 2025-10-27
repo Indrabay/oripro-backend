@@ -17,12 +17,22 @@ class UserLogRepository {
   async getByUserID(userID, ctx) {
     try {
       ctx.log?.info({ user_id: userID }, "UserLogRepository.getByUserID");
+      
       const userLogs = await this.userLogModel.findAll({
         where: { user_id: userID },
-        order: [["created_at", "DESC"]]
+        order: [["created_at", "DESC"]],
+        include: [
+          {
+            model: this.userModel,
+            as: "createdBy",
+            attributes: ["id", "name", "email"],
+          },
+        ],
       });
       
-      return userLogs.map((u) => {
+      ctx.log?.info({ user_id: userID, rawLogsCount: userLogs.length }, "UserLogRepository.getByUserID_raw_result");
+      
+      const mappedLogs = userLogs.map((u) => {
         const log = u.toJSON();
         // Ensure created_by is properly mapped
         if (log.createdBy) {
@@ -31,6 +41,9 @@ class UserLogRepository {
         }
         return log;
       });
+      
+      ctx.log?.info({ user_id: userID, mappedLogsCount: mappedLogs.length }, "UserLogRepository.getByUserID_mapped_result");
+      return mappedLogs;
     } catch (error) {
       ctx.log?.error(
         { error, user_id: userID },

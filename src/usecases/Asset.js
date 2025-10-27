@@ -48,7 +48,21 @@ class AssetUsecase {
           if (data.photos) {
             await this.createAttachment(asset.id, data.photos, "photo", t);
           }
-          await this.assetLogRepository.create(asset, ctx, t);
+          // Create log entry - only store essential data
+          const assetLog = {
+            asset_id: asset.id,
+            action: 'CREATE',
+            old_data: null,
+            new_data: {
+              name: asset.name,
+              code: asset.code,
+              status: AssetStatusIntToStr[asset.status],
+              asset_type: AssetTypeIntToStr[asset.asset_type],
+            },
+            created_by: ctx.userID,
+          };
+
+          await this.assetLogRepository.create(assetLog, { ...ctx, transaction: t });
         }
 
         asset.asset_type = AssetTypeIntToStr[asset.asset_type];
@@ -153,7 +167,56 @@ class AssetUsecase {
       ctx
     );
 
-    await this.assetLogRepository.create(asset, ctx);
+    // Create log entry - only store changed data
+    const oldData = {};
+    const newData = {};
+    
+    // Check which fields actually changed
+    if (data.name !== undefined && data.name !== asset.name) {
+      oldData.name = asset.name;
+      newData.name = data.name;
+    }
+    if (data.description !== undefined && data.description !== asset.description) {
+      oldData.description = asset.description;
+      newData.description = data.description;
+    }
+    if (data.address !== undefined && data.address !== asset.address) {
+      oldData.address = asset.address;
+      newData.address = data.address;
+    }
+    if (data.area !== undefined && data.area !== asset.area) {
+      oldData.area = asset.area;
+      newData.area = data.area;
+    }
+    if (data.asset_type !== undefined && data.asset_type !== asset.asset_type) {
+      oldData.asset_type = AssetTypeIntToStr[asset.asset_type];
+      newData.asset_type = AssetTypeIntToStr[data.asset_type];
+    }
+    if (data.status !== undefined && data.status !== asset.status) {
+      oldData.status = AssetStatusIntToStr[asset.status];
+      newData.status = AssetStatusIntToStr[data.status];
+    }
+    if (data.longitude !== undefined && data.longitude !== asset.longitude) {
+      oldData.longitude = asset.longitude;
+      newData.longitude = data.longitude;
+    }
+    if (data.latitude !== undefined && data.latitude !== asset.latitude) {
+      oldData.latitude = asset.latitude;
+      newData.latitude = data.latitude;
+    }
+
+    // Only create log if there are actual changes
+    if (Object.keys(oldData).length > 0) {
+      const assetLog = {
+        asset_id: asset.id,
+        action: 'UPDATE',
+        old_data: oldData,
+        new_data: newData,
+        created_by: ctx.userID,
+      };
+
+      await this.assetLogRepository.create(assetLog, ctx);
+    }
 
     return asset;
   }
@@ -169,19 +232,30 @@ class AssetUsecase {
       );
       if (!ok) return "forbidden";
     }
+    // Create log entry before deletion
+    const assetLog = {
+      asset_id: asset.id,
+      action: 'DELETE',
+      old_data: {
+        name: asset.name,
+        code: asset.code,
+        status: AssetStatusIntToStr[asset.status],
+        asset_type: AssetTypeIntToStr[asset.asset_type],
+      },
+      new_data: null,
+      created_by: ctx.userID,
+    };
+
+    await this.assetLogRepository.create(assetLog, ctx);
+
     await this.assetRepository.delete(asset.id, ctx);
     return true;
   }
 
   async getAssetLogs(id, ctx) {
-    const assetLogs = await this.assetLogRepository.getByAssetID(id, ctx)
-
-    return assetLogs.map(al => {
-      al.asset_type = AssetTypeIntToStr[al.asset_type];
-        al.status = AssetStatusIntToStr[al.status];
-
-        return al
-    })
+    ctx.log?.info({ asset_id: id }, "AssetUsecase.getAssetLogs");
+    const assetLogs = await this.assetLogRepository.findByAssetID(id, ctx);
+    return assetLogs;
   }
 }
 

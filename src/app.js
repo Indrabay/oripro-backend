@@ -93,7 +93,7 @@ const unitAttachmentRepository = new UnitAttachmentRepository(modelUnitAttachmen
 const tenantCategoryRepository = new TenantCategoryRepository(modelTenantCategory);
 const userAccessMenuRepository = new UserAccessMenuRepository(User, modelRole, modelRoleMenuPermission, modelMenu);
 const userLogRepository = new UserLogRepository(modelUserLog, User, modelRole)
-const unitLogRepository = new UnitLogRepository(modelUnitLog, Asset, User)
+const unitLogRepository = new UnitLogRepository(modelUnitLog, User)
 const tenantLogRepository = new TenantLogRepository(modelTenantLog, User);
 const userAssetRepository = new UserAssetRepository(modelUserAsset);
 

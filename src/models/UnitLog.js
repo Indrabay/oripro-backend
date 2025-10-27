@@ -14,55 +14,25 @@ UnitLog.init(
       type: DataTypes.UUID,
       allowNull: false
     },
-    asset_id: {
-      type: DataTypes.UUID,
-      allowNull: false,
-    },
-    name: {
+    action: {
       type: DataTypes.STRING,
       allowNull: false,
     },
-    size: {
-      type: DataTypes.FLOAT,
-      allowNull: false,
-    },
-    rent_price: {
-      type: DataTypes.FLOAT,
-      allowNull: false,
-    },
-    lamp: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0,
-    },
-    electric_socket: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0,
-    },
-    electrical_power: DataTypes.INTEGER,
-    electrical_unit: {
-      type: DataTypes.STRING,
-      defaultValue: "Watt",
-    },
-    is_toilet_exist: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false,
-    },
-    description: {
-      type: DataTypes.STRING,
+    old_data: {
+      type: DataTypes.JSON,
       allowNull: true,
     },
-    is_deleted: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false,
+    new_data: {
+      type: DataTypes.JSON,
+      allowNull: true,
+    },
+    created_by: {
+      type: DataTypes.UUID,
+      allowNull: true,
     },
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
-    },
-    is_deleted: DataTypes.BOOLEAN,
-    created_by: {
-      type: DataTypes.UUID,
-      allowNull: true,
     },
   },
   {
@@ -70,7 +40,7 @@ UnitLog.init(
     modelName: "UnitLog",
     tableName: "unit_logs",
     timestamps: false,
-    indexes: [{ fields: ["code"] }, { fields: ["asset_id"] }],
+    indexes: [{ fields: ["unit_id"] }],
   }
 );
 
@@ -78,10 +48,6 @@ UnitLog.associate = (models) => {
   UnitLog.belongsTo(models.User, {
     foreignKey: 'created_by',
     as: 'createdBy',
-  });
-  UnitLog.belongsTo(models.Asset, {
-    foreignKey: 'asset_id',
-    as: 'asset',
   });
 };
 
