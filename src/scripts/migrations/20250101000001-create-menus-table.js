@@ -52,11 +52,11 @@ module.exports = {
         defaultValue: Sequelize.NOW,
       },
       created_by: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.UUID,
         allowNull: true,
       },
       updated_by: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.UUID,
         allowNull: true,
       },
     });
