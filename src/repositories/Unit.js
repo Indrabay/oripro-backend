@@ -1,4 +1,5 @@
 const { Op } = require("sequelize");
+const sequelize = require("../models/sequelize");
 
 class UnitRepository {
   constructor(unitModel, assetModel, userModel) {
@@ -170,6 +171,34 @@ class UnitRepository {
     if (!unit) return null;
     await unit.destroy();
     return unit;
+  }
+
+  async countByAssetIds(assetIds, ctx = {}) {
+    ctx.log?.debug({ assetIds }, "UnitRepository.countByAssetIds");
+    if (!assetIds || assetIds.length === 0) {
+      return {};
+    }
+
+    const unitCounts = await this.unitModel.findAll({
+      attributes: [
+        'asset_id',
+        [sequelize.fn('COUNT', sequelize.literal('*')), 'total_units']
+      ],
+      where: {
+        asset_id: assetIds,
+        is_deleted: false
+      },
+      group: ['asset_id'],
+      raw: true
+    });
+
+    // Create a map of asset_id to unit count
+    const unitCountMap = {};
+    unitCounts.forEach(count => {
+      unitCountMap[count.asset_id] = parseInt(count.total_units);
+    });
+
+    return unitCountMap;
   }
 }
 

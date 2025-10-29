@@ -6,10 +6,11 @@ const PrefixAsset = "ASSET";
 const { AssetStatusIntToStr, AssetTypeIntToStr } = require('../models/Asset');
 
 class AssetUsecase {
-  constructor(assetRepository, assetLogRepository, assetAttachmentRepository) {
+  constructor(assetRepository, assetLogRepository, assetAttachmentRepository, unitRepository) {
     this.assetRepository = assetRepository;
     this.assetLogRepository = assetLogRepository;
     this.assetAttachmentRepository = assetAttachmentRepository;
+    this.unitRepository = unitRepository;
   }
 
   async createAsset(data, ctx) {
@@ -105,10 +106,37 @@ class AssetUsecase {
         a.status = AssetStatusIntToStr[a.status];
         return a
       })
+      
+      // Get unit counts per asset
+      const assetIds = data.assets.map(a => a.id);
+      const unitCountMap = await this.unitRepository.countByAssetIds(assetIds, ctx);
+      
+      // Add total_units to each asset
+      data.assets.forEach(asset => {
+        asset.total_units = unitCountMap[asset.id] || 0;
+      });
+      
       return data
 
     }
-    return await this.assetRepository.listForAdmin(ctx.userId, queryParams, ctx);
+    const assets = await this.assetRepository.listForAdmin(ctx.userId, queryParams, ctx);
+    
+    // Transform asset_type and status to strings
+    assets.forEach(a => {
+      a.asset_type = AssetTypeIntToStr[a.asset_type];
+      a.status = AssetStatusIntToStr[a.status];
+    });
+    
+    // Get unit counts per asset for admin users
+    const assetIds = assets.map(a => a.id);
+    const unitCountMap = await this.unitRepository.countByAssetIds(assetIds, ctx);
+    
+    // Add total_units to each asset
+    assets.forEach(asset => {
+      asset.total_units = unitCountMap[asset.id] || 0;
+    });
+    
+    return assets;
   }
 
   async getAsset(id, ctx) {

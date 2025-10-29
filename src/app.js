@@ -158,7 +158,7 @@ Object.keys(models).forEach(modelName => {
 });
 
 // initialize usecase
-const assetUsecase = new assetUc(assetRepository, assetLogRepository, assetAttachmentRepository);
+const assetUsecase = new assetUc(assetRepository, assetLogRepository, assetAttachmentRepository, unitRepository);
 const authUsecase = new authUc(
   userRepository,
   process.env.JWT_SECRET,
