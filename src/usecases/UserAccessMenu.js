@@ -53,18 +53,25 @@ class UserAccessMenuUsecase {
       
       // Transform menus to sidebar format
       const sidebarData = {
-        navMain: menus.map(menu => ({
-          title: menu.title,
-          url: menu.url || "#",
-          icon: menu.icon, // Frontend akan handle konversi string ke LucideIcon
-          isActive: menu.is_active,
-          items: menu.children && menu.children.length > 0 ? 
-            menu.children.map(child => ({
+        navMain: menus.map(menu => {
+          const sidebarItem = {
+            title: menu.title,
+            url: menu.url || "#",
+            icon: menu.icon, // Frontend akan handle konversi string ke LucideIcon
+            isActive: menu.is_active,
+          };
+          
+          // Only add items if menu has children
+          if (menu.children && menu.children.length > 0) {
+            sidebarItem.items = menu.children.map(child => ({
               title: child.title,
               url: child.url || "#",
               circleColor: this.getCircleColor(child.title)
-            })) : undefined
-        }))
+            }));
+          }
+          
+          return sidebarItem;
+        })
       };
       
       ctx.log?.info({ userId, sidebarItemCount: sidebarData.navMain.length }, 'usecase_get_user_sidebar_data_success');
