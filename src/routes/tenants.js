@@ -18,14 +18,28 @@ function InitTenantRouter(TenantUseCase) {
       body('contract_begin_at').notEmpty(),
       body('rent_duration').isNumeric(),
       body('rent_duration_unit').notEmpty().isString(),
-      body('user_id').notEmpty().isString(),
+      // user_id boleh kosong jika new_user disediakan
+      body('user_id').optional().isString(),
+      body('new_user').optional().isObject(),
+      body('new_user.email').optional().isEmail(),
+      body('new_user.password').optional().isString().notEmpty(),
+      body('new_user.name').optional().isString().notEmpty(),
+      body('new_user.roleId').optional(),
+      body('new_user.role_id').optional(),
+      body('new_user.phone').optional(),
+      body('new_user.gender').optional(),
       body('categories').notEmpty().isArray(),
     ],
     async (req, res) => {
     try {
-      req.log?.info({}, "TenantRouter.createTenant");
+      req.log?.info({ body: req.body }, "TenantRouter.createTenant");
+      console.log("TenantRouter.createTenant - received body:", JSON.stringify(req.body, null, 2));
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json(createResponse(null, "bad request", 400, false, {}, errors));
+      // Normalisasi: treat empty string as undefined sehingga ditangani di usecase
+      if (req.body && typeof req.body.user_id === 'string' && req.body.user_id.trim() === '') {
+        delete req.body.user_id;
+      }
       const {
         name,
         tenant_identifications,
@@ -36,13 +50,18 @@ function InitTenantRouter(TenantUseCase) {
         rent_duration_unit,
         categories,
         user_id,
+        new_user,
       } = req.body;
+      
+      console.log("TenantRouter.createTenant - extracted user_id:", user_id);
+      console.log("TenantRouter.createTenant - extracted new_user:", new_user);
 
       const tenant = await TenantUseCase.createTenant({
-        name, tenant_identifications, contract_documents, contract_begin_at, unit_ids, rent_duration, rent_duration_unit, user_id, categories,createdBy: req.auth.userId
+        name, tenant_identifications, contract_documents, contract_begin_at, unit_ids, rent_duration, rent_duration_unit, user_id, new_user, categories,createdBy: req.auth.userId
       }, {userId: req.auth.userId, log: req.log});
       res.status(201).json(createResponse(tenant, "success", 201));
     } catch (err) {
+      console.error("TenantRouter.createTenant_error: " + err.message);
       req.log?.error({}, "TenantRouter.createTenant_error");
       res.status(400).json(createResponse(null, "failed", 400, false, {}, err));
     }

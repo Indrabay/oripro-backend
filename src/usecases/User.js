@@ -14,26 +14,23 @@ class UserUsecase {
   }
   async listUsers(filters, ctx) {
     ctx.log?.info({}, "usecase_list_users");
-    if (ctx.roleName === "super_admin") {
-      const data = await this.userRepository.listAll(filters, ctx);
-      return {
-        users: data.users.map((user) => {
-          const { password, ...userWithoutPassword } = user;
-          userWithoutPassword.gender =
-            UserGenderIntToStr[userWithoutPassword.gender];
-          userWithoutPassword.status =
-            UserStatusIntToStr[userWithoutPassword.status];
-          userWithoutPassword.created_by = userWithoutPassword.createdBy;
-          userWithoutPassword.updated_by = userWithoutPassword.updatedBy;
+    const data = await this.userRepository.listAll(filters, ctx);
+    return {
+      users: data.users.map((user) => {
+        const { password, ...userWithoutPassword } = user;
+        userWithoutPassword.gender =
+          UserGenderIntToStr[userWithoutPassword.gender];
+        userWithoutPassword.status =
+          UserStatusIntToStr[userWithoutPassword.status];
+        userWithoutPassword.created_by = userWithoutPassword.createdBy;
+        userWithoutPassword.updated_by = userWithoutPassword.updatedBy;
 
-          delete userWithoutPassword.createdBy;
-          delete userWithoutPassword.updatedBy;
-          return userWithoutPassword;
-        }),
-        total: data.total,
-      };
-    }
-    return "forbidden";
+        delete userWithoutPassword.createdBy;
+        delete userWithoutPassword.updatedBy;
+        return userWithoutPassword;
+      }),
+      total: data.total,
+    };
   }
 
   async getUser(id, ctx) {

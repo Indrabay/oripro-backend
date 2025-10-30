@@ -142,14 +142,7 @@ class AssetUsecase {
   async getAsset(id, ctx) {
     const asset = await this.assetRepository.findById(id, ctx);
     if (!asset) return null;
-    if (ctx.roleName !== "super_admin") {
-      const ok = await this.assetRepository.isAdminAssigned(
-        asset.id,
-        ctx.userId,
-        ctx
-      );
-      if (!ok) return "forbidden";
-    }
+    
     const attachments = await this.assetAttachmentRepository.getByAssetID(
       asset.id
     );
@@ -181,14 +174,7 @@ class AssetUsecase {
   async updateAsset(id, data, ctx) {
     let asset = await this.assetRepository.findById(id, ctx);
     if (!asset) return null;
-    if (ctx.roleName !== "super_admin") {
-      const ok = await this.assetRepository.isAdminAssigned(
-        asset.id,
-        ctx.userId,
-        ctx
-      );
-      if (!ok) return "forbidden";
-    }
+    
     asset = await this.assetRepository.update(
       asset.id,
       { ...data, updatedBy: ctx.userId },
@@ -252,14 +238,7 @@ class AssetUsecase {
   async deleteAsset(id, ctx) {
     const asset = await this.assetRepository.findById(id, ctx);
     if (!asset) return null;
-    if (ctx.roleName !== "super_admin") {
-      const ok = await this.assetRepository.isAdminAssigned(
-        asset.id,
-        ctx.userId,
-        ctx
-      );
-      if (!ok) return "forbidden";
-    }
+    
     // Create log entry before deletion
     const assetLog = {
       asset_id: asset.id,

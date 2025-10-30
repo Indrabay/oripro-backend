@@ -17,7 +17,8 @@ class TenantUseCase {
     tenantCategoryMapRepo,
     tenantCategoryRepo,
     unitRepository,
-    tenantLogRepository
+    tenantLogRepository,
+    userUsecase
   ) {
     this.tenantRepository = tenantRepository;
     this.tenantAttachmentRepository = tenantAttachmentRepository;
@@ -26,12 +27,51 @@ class TenantUseCase {
     this.tenantCategoryRepo = tenantCategoryRepo;
     this.unitRepository = unitRepository;
     this.tenantLogRepository = tenantLogRepository;
+    this.userUsecase = userUsecase;
   }
 
   async createTenant(data, ctx) {
     try {
       ctx.log?.info(data, "TenantUsecase.createTenant");
+      console.log("TenantUsecase.createTenant - received data:", JSON.stringify(data, null, 2));
+      console.log("TenantUsecase.createTenant - user_id:", data.user_id);
+      console.log("TenantUsecase.createTenant - new_user:", data.new_user);
       const result = await sequelize.transaction(async (t) => {
+        // Jika user_id tidak ada dan ada data new_user, buat user terlebih dahulu
+        if ((!data.user_id || data.user_id === '') && data.new_user && this.userUsecase) {
+          console.log("Creating new user from new_user data");
+          const newUserPayload = {
+            name: data.new_user.name,
+            email: data.new_user.email,
+            password: data.new_user.password,
+            phone: data.new_user.phone,
+            gender: data.new_user.gender,
+            roleId: data.new_user.roleId || data.new_user.role_id,
+            status: data.new_user.status || 'active',
+          };
+
+          let createdUser = await this.userUsecase.createUser(newUserPayload, ctx);
+          if (createdUser === 'exists') {
+            // Ambil user by email jika sudah ada
+            const existing = await this.userUsecase.userRepository.findByEmail(newUserPayload.email, ctx);
+            if (!existing) throw new Error('User already exists but cannot be retrieved');
+            data.user_id = existing.id;
+          } else if (createdUser && createdUser.id) {
+            data.user_id = createdUser.id;
+          } else {
+            throw new Error('Failed to create user for tenant');
+          }
+          console.log("User created successfully, user_id:", data.user_id);
+        }
+
+        // Pastikan user_id tersedia setelah proses di atas
+        if (!data.user_id || String(data.user_id).trim() === '') {
+          console.error("ERROR: user_id is missing or empty!");
+          console.error("data.user_id:", data.user_id);
+          console.error("data.new_user:", data.new_user);
+          throw new Error('user_id is required for creating tenant');
+        }
+        console.log("user_id: " + data.user_id);
         const createTenantData = {
           user_id: data.user_id,
           name: data.name,
