@@ -13,73 +13,7 @@ const poolConfig = {
 };
 
 // Additional configuration for serverless and Supabase
-// Supabase and most managed databases require SSL for external connections
 const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
-
-// Support connection string (preferred) or individual variables
-const DATABASE_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.PGURI;
-
-// Extract individual variables for fallback or if connection string not provided
-const dbHost = process.env.DB_HOST || process.env.PGHOST || '';
-const dbUser = process.env.DB_USER || process.env.PGUSER || '';
-const dbPassword = process.env.DB_PASSWORD || process.env.PGPASSWORD || '';
-const dbName = process.env.DB_NAME || process.env.PGDATABASE || '';
-
-// Validate required environment variables (especially critical in Vercel)
-// Check if we have either connection string OR individual variables
-if (!DATABASE_URL && !dbHost) {
-  console.error('[Sequelize] ERROR: Database configuration is not set!');
-  console.error('[Sequelize] Please provide either:');
-  console.error('[Sequelize]   - DATABASE_URL (preferred) or POSTGRES_URL or PGURI');
-  console.error('[Sequelize]   OR individual variables: PGHOST/DB_HOST, PGUSER/DB_USER, etc.');
-  console.error('[Sequelize] Checked:', {
-    DATABASE_URL: process.env.DATABASE_URL ? 'set' : 'NOT SET',
-    POSTGRES_URL: process.env.POSTGRES_URL ? 'set' : 'NOT SET',
-    PGURI: process.env.PGURI ? 'set' : 'NOT SET',
-    DB_HOST: process.env.DB_HOST ? 'set' : 'NOT SET',
-    PGHOST: process.env.PGHOST ? 'set' : 'NOT SET',
-    VERCEL: process.env.VERCEL,
-    VERCEL_ENV: process.env.VERCEL_ENV,
-  });
-}
-
-// Check if this is a Supabase connection (multiple checks for reliability)
-// Check both connection string and individual hostname
-const connectionStringHost = DATABASE_URL ? (DATABASE_URL.match(/@([^:/\s]+)/)?.[1] || '') : '';
-const effectiveHost = dbHost || connectionStringHost;
-const isSupabase = effectiveHost && (
-  effectiveHost.includes('.supabase.co') || 
-  effectiveHost.includes('supabase') ||
-  DATABASE_URL?.includes('.supabase.co') ||
-  DATABASE_URL?.includes('supabase') ||
-  (isVercel && effectiveHost.match(/db\.[a-z0-9]+\.supabase/))
-);
-
-// Enable SSL if explicitly set, or if detected Supabase hostname
-// Supabase ALWAYS requires SSL for external connections
-// Priority: explicit setting > Supabase detection > Vercel + non-localhost
-const shouldUseSSL = 
-  process.env.DB_SSL === 'true' || 
-  process.env.PGSSL === 'true' || 
-  isSupabase || // Supabase ALWAYS requires SSL - this is mandatory
-  (isVercel && dbHost && dbHost.length > 0 && !dbHost.includes('localhost') && !dbHost.includes('127.0.0.1'));
-
-// FORCE SSL for Supabase connections - this is non-negotiable
-// If Supabase is detected but SSL logic failed, override it
-let finalShouldUseSSL = shouldUseSSL;
-if (isSupabase && !finalShouldUseSSL) {
-  console.warn('[Sequelize] ⚠️  WARNING: Supabase detected but SSL was not enabled! Forcing SSL...');
-  finalShouldUseSSL = true;
-}
-
-// Set dialect options with SSL when needed
-// Use finalShouldUseSSL to ensure Supabase always gets SSL
-const dialectOptions = finalShouldUseSSL
-  ? {
-      // SSL configuration for managed databases (Supabase, AWS RDS, etc.)
-      ssl: { rejectUnauthorized: false } // Required for Supabase and most cloud databases
-    }
-  : {};
 
 if (DB_TYPE === 'mysql') {
   sequelize = new Sequelize(
@@ -91,167 +25,118 @@ if (DB_TYPE === 'mysql') {
       dialect: 'mysql',
       logging: false,
       pool: poolConfig,
-      dialectOptions,
+      dialectOptions: {},
     }
   );
 } else {
-  // Validate we have either connection string OR all required individual values
-  if (!DATABASE_URL && (!dbHost || !dbUser || !dbName)) {
-    const missing = [];
-    if (!DATABASE_URL && !dbHost) missing.push('host (DB_HOST or PGHOST) or DATABASE_URL');
-    if (!DATABASE_URL && !dbUser) missing.push('user (DB_USER or PGUSER) or DATABASE_URL');
-    if (!DATABASE_URL && !dbName) missing.push('database (DB_NAME or PGDATABASE) or DATABASE_URL');
-    
-    console.error('[Sequelize] ERROR: Missing required database configuration:', missing.join(', '));
-    console.error('[Sequelize] Environment check:', {
-      DATABASE_URL: process.env.DATABASE_URL ? 'set' : 'NOT SET',
-      POSTGRES_URL: process.env.POSTGRES_URL ? 'set' : 'NOT SET',
-      PGURI: process.env.PGURI ? 'set' : 'NOT SET',
-      VERCEL: process.env.VERCEL,
-      VERCEL_ENV: process.env.VERCEL_ENV,
-      DB_HOST: process.env.DB_HOST ? 'set' : 'NOT SET',
-      PGHOST: process.env.PGHOST ? 'set' : 'NOT SET',
-      DB_USER: process.env.DB_USER ? 'set' : 'NOT SET',
-      PGUSER: process.env.PGUSER ? 'set' : 'NOT SET',
-      DB_NAME: process.env.DB_NAME ? 'set' : 'NOT SET',
-      PGDATABASE: process.env.PGDATABASE ? 'set' : 'NOT SET',
-    });
+  // PostgreSQL - Use connection string only
+  const DATABASE_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.PGURI;
+
+  if (!DATABASE_URL) {
+    console.error('[Sequelize] ERROR: DATABASE_URL is required for PostgreSQL!');
+    console.error('[Sequelize] Please set DATABASE_URL, POSTGRES_URL, or PGURI environment variable');
+    console.error('[Sequelize] Format: postgresql://user:password@host:port/database?sslmode=require');
+    console.error('[Sequelize] NOTE: If password contains special characters (@, /, etc.), they must be URL-encoded');
+    console.error('[Sequelize] Example: @ becomes %40, / becomes %2F');
+    throw new Error('DATABASE_URL is required for PostgreSQL');
   }
 
-  // ALWAYS enable SSL for Supabase - configure it properly
-  // For Supabase, SSL configuration must use rejectUnauthorized: false
-  // This is the standard format for Supabase connections
+  // Parse and validate connection string
+  let connectionUrl = DATABASE_URL || '';
+  
+  // Check if connection string needs password encoding
+  // If password contains @ but URL doesn't start with properly encoded format, fix it
+  try {
+    // Try to parse the URL to detect if it's malformed
+    const url = new URL(connectionUrl);
+    const hostname = url.hostname;
+    
+    // If hostname looks wrong (very short, no dots, etc.), password might not be encoded
+    if (hostname.length < 5 || (!hostname.includes('.') && !hostname.includes('localhost'))) {
+      console.warn('[Sequelize] WARNING: Connection string hostname looks invalid:', hostname);
+      console.warn('[Sequelize] This usually means password contains special characters that need URL encoding');
+      console.warn('[Sequelize] Please URL-encode your password (e.g., @ -> %40, / -> %2F)');
+    }
+  } catch (e) {
+    // URL parsing failed - might be malformed
+    console.error('[Sequelize] ERROR: Connection string appears to be malformed');
+    console.error('[Sequelize] Make sure passwords with special characters are URL-encoded');
+    console.error('[Sequelize] Special characters that need encoding: @ %40, / %2F, : %3A, # %23, ? %3F, & %26');
+    console.error(connectionUrl);
+    console.error(e);
+    throw new Error('Invalid DATABASE_URL format. Check password encoding.');
+  }
+  
+  // Check if this is a Supabase connection
+  const isSupabase = connectionUrl.includes('.supabase.co') || connectionUrl.includes('supabase');
+  
+  // For Supabase and cloud databases, we configure SSL via dialectOptions
+  // Don't add sslmode to URL as it can conflict with dialectOptions
+  // The dialectOptions will handle SSL configuration properly
+  
+  // Remove any existing sslmode from URL to avoid conflicts (we'll use dialectOptions instead)
+  if (connectionUrl.includes('sslmode=')) {
+    connectionUrl = connectionUrl.replace(/[?&]sslmode=[^&]*/, '');
+    // Clean up any orphaned ? or & at the end
+    connectionUrl = connectionUrl.replace(/\?$/, '').replace(/&$/, '');
+    if (isVercel || process.env.NODE_ENV !== 'production') {
+      console.log('[Sequelize] Removed sslmode from URL - using dialectOptions instead');
+    }
+  }
+
+  // SSL configuration for dialect options (required for Supabase)
+  // Supabase uses self-signed certificates, so we must set rejectUnauthorized to false
+  // This allows the connection to proceed even though the cert chain can't be verified
   const postgresDialectOptions = {
     ssl: {
-      rejectUnauthorized: false  // Required for Supabase - allows self-signed certs
+      require: true,              // Require SSL connection
+      rejectUnauthorized: false  // Don't reject self-signed certificates (required for Supabase)
     }
   };
   
-  // Force SSL to be enabled - this is non-negotiable for Supabase
-  // Even if detection failed, we enable it for Vercel + non-localhost connections
-  const effectiveHostForSSL = dbHost || connectionStringHost;
-  if (isVercel && effectiveHostForSSL && !effectiveHostForSSL.includes('localhost') && !effectiveHostForSSL.includes('127.0.0.1')) {
-    console.log('[Sequelize] ✅ SSL FORCED ON - Vercel environment with remote database');
-  }
-
-  // Use connection string if provided (preferred method with SSL in URL)
-  // Format: postgresql://user:password@host:port/database?sslmode=require
-  if (DATABASE_URL) {
-    // Parse and ensure SSL is in the connection string
-    let connectionUrl = DATABASE_URL;
-    
-    // Ensure SSL mode is set in connection string
-    if (!connectionUrl.includes('sslmode=') && !connectionUrl.includes('ssl=')) {
-      // Add SSL mode to connection string
-      const separator = connectionUrl.includes('?') ? '&' : '?';
-      connectionUrl = `${connectionUrl}${separator}sslmode=require`;
-      console.log('[Sequelize] Added sslmode=require to connection string');
-    }
-    
-    // Log what we're using (hide password)
-    const safeUrl = connectionUrl.replace(/:[^:@]+@/, ':****@');
-    if (isVercel || process.env.NODE_ENV !== 'production') {
-      console.log('[Sequelize] Using DATABASE_URL connection string:', safeUrl);
-      console.log('[Sequelize] SSL in URL:', connectionUrl.includes('ssl'));
-    }
-    
-    sequelize = new Sequelize(connectionUrl, {
-      dialect: 'postgres',
-      logging: false,
-      pool: poolConfig,
-      dialectOptions: postgresDialectOptions, // Ensure SSL options are also set here
-      dialectModule: require('pg'),
+  if (isVercel || process.env.NODE_ENV !== 'production') {
+    console.log('[Sequelize] SSL configured via dialectOptions:', {
+      require: true,
+      rejectUnauthorized: false,
+      note: 'This allows self-signed certificates (required for Supabase)'
     });
-  } else {
-    // Fallback to individual environment variables
-    if (isVercel || process.env.NODE_ENV !== 'production') {
-      console.log('[Sequelize] Using individual environment variables:', {
-        host: dbHost,
-        port: process.env.PGPORT || 5432,
-        database: dbName,
-        user: dbUser,
-        dialectOptions: postgresDialectOptions,
-      });
-    }
-    
-    sequelize = new Sequelize(
-      dbName,
-      dbUser,
-      dbPassword,
-      {
-        host: dbHost,
-        port: process.env.PGPORT || 5432,
-        dialect: 'postgres',
-        logging: false,
-        pool: poolConfig,
-        dialectOptions: postgresDialectOptions, // SSL ALWAYS enabled for Supabase/Vercel
-        dialectModule: require('pg'),
-      }
-    );
   }
 
-  // Verify the connection config after creation
+  // Log connection info (hide password, but show parsed hostname for debugging)
   if (isVercel || process.env.NODE_ENV !== 'production') {
     try {
-      // Access config safely - it may not be immediately available
-      const config = sequelize.config || {};
-      const dialectOpts = config.dialectOptions || {};
-      console.log('[Sequelize] Connection instance created. Config:', {
-        hasDialectOptions: !!dialectOpts,
-        hasSSL: !!dialectOpts.ssl,
-        sslRejectUnauthorized: dialectOpts.ssl?.rejectUnauthorized,
-        host: config.host || 'unknown',
-        database: config.database || 'unknown',
+      const url = new URL(connectionUrl);
+      const safeUrl = connectionUrl.replace(/:[^:@]+@/, ':****@');
+      console.log('[Sequelize] PostgreSQL connection:', {
+        usingConnectionString: true,
+        url: safeUrl,
+        parsedHostname: url.hostname,
+        parsedPort: url.port || '5432',
+        parsedDatabase: url.pathname?.replace('/', '') || 'unknown',
+        isSupabase,
+        sslInUrl: connectionUrl.includes('ssl'),
+        hasSSL: true,
       });
     } catch (e) {
-      console.error('[Sequelize] Error logging config:', e.message);
-      console.log('[Sequelize] SSL is configured in postgresDialectOptions:', postgresDialectOptions);
+      const safeUrl = connectionUrl.replace(/:[^:@]+@/, ':****@');
+      console.log('[Sequelize] PostgreSQL connection:', {
+        usingConnectionString: true,
+        url: safeUrl,
+        parseError: 'Could not parse URL for validation',
+        isSupabase,
+        sslInUrl: connectionUrl.includes('ssl'),
+        hasSSL: true,
+      });
     }
   }
-}
 
-// Log connection configuration (without sensitive data) for debugging
-// Always log in Vercel to help debug connection issues
-if (isVercel || process.env.NODE_ENV !== 'production') {
-  // Log SSL configuration first
-  console.log('[Sequelize] SSL Configuration:', {
-    shouldUseSSL: finalShouldUseSSL,
-    reason: isSupabase ? '✅ Supabase detected (MANDATORY)' : 
-            process.env.DB_SSL === 'true' || process.env.PGSSL === 'true' ? '✅ Explicitly set' :
-            isVercel && dbHost && !dbHost.includes('localhost') ? '✅ Vercel + non-localhost' :
-            '❌ Not needed',
-    isSupabase,
-    isVercel,
-    dbHost: dbHost ? `${dbHost.substring(0, 40)}` : 'empty',
+  sequelize = new Sequelize(connectionUrl, {
+    dialect: 'postgres',
+    logging: false,
+    pool: poolConfig,
+    dialectOptions: postgresDialectOptions, // SSL always enabled
+    dialectModule: require('pg'),
   });
-  
-  if (isSupabase && !finalShouldUseSSL) {
-    console.error('[Sequelize] ❌ CRITICAL ERROR: Supabase detected but SSL is disabled!');
-    console.error('[Sequelize] This will cause connection failures. SSL should be enabled.');
-  }
-  
-  // Log full database configuration
-  console.log('[Sequelize] Database configuration:', {
-    dialect: DB_TYPE,
-    host: dbHost || '⚠️ NOT SET - This will cause ENOTFOUND errors!',
-    port: process.env.PGPORT || 5432,
-    database: dbName || '⚠️ NOT SET',
-    user: dbUser || '⚠️ NOT SET',
-    password: dbPassword ? '***set***' : '⚠️ NOT SET',
-    ssl: finalShouldUseSSL ? '✅ ENABLED' : '❌ DISABLED',
-    isVercel,
-    isSupabase,
-    hasAllRequiredVars: !!(dbHost && dbUser && dbName && dbPassword),
-  });
-  
-  if (!dbHost || !dbUser || !dbName || !dbPassword) {
-    console.error('[Sequelize] ⚠️  MISSING REQUIRED ENVIRONMENT VARIABLES!');
-    console.error('[Sequelize] Please set these in Vercel:');
-    if (!dbHost) console.error('[Sequelize]   - PGHOST or DB_HOST');
-    if (!dbUser) console.error('[Sequelize]   - PGUSER or DB_USER');
-    if (!dbName) console.error('[Sequelize]   - PGDATABASE or DB_NAME');
-    if (!dbPassword) console.error('[Sequelize]   - PGPASSWORD or DB_PASSWORD');
-  }
 }
 
 module.exports = sequelize;
