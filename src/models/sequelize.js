@@ -47,6 +47,7 @@ if (DB_TYPE === 'mysql') {
       logging: false,
       pool: poolConfig,
       dialectOptions,
+      dialectModule: require('pg'),
     }
   );
 }
