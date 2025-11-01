@@ -12,13 +12,24 @@ const poolConfig = {
   idle: 10000, // Maximum time (ms) connection can be idle before release
 };
 
-// Additional configuration for serverless
-const dialectOptions = process.env.VERCEL || process.env.VERCEL_ENV
+// Additional configuration for serverless and Supabase
+// Supabase and most managed databases require SSL for external connections
+const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
+const dbHost = process.env.DB_HOST || process.env.PGHOST || '';
+const isSupabase = dbHost.includes('.supabase.co');
+
+// Enable SSL if explicitly set, or if detected Supabase hostname
+// Supabase ALWAYS requires SSL for external connections
+const shouldUseSSL = process.env.DB_SSL === 'true' || 
+                     process.env.PGSSL === 'true' || 
+                     isSupabase ||
+                     (isVercel && dbHost && !dbHost.includes('localhost') && !dbHost.includes('127.0.0.1'));
+
+// Set dialect options with SSL when needed
+const dialectOptions = shouldUseSSL
   ? {
-      // SSL is often required for managed databases on Vercel
-      ssl: process.env.DB_SSL === 'true' || process.env.PGSSL === 'true' 
-        ? { rejectUnauthorized: false }
-        : false,
+      // SSL configuration for managed databases (Supabase, AWS RDS, etc.)
+      ssl: { rejectUnauthorized: false } // Required for Supabase and most cloud databases
     }
   : {};
 
@@ -50,6 +61,18 @@ if (DB_TYPE === 'mysql') {
       dialectModule: require('pg'),
     }
   );
+}
+
+// Log connection configuration (without sensitive data) for debugging
+if (process.env.NODE_ENV !== 'production' || isVercel) {
+  console.log('[Sequelize] Database config:', {
+    dialect: DB_TYPE,
+    host: process.env.DB_HOST || process.env.PGHOST || 'not set',
+    port: process.env.PGPORT || 5432,
+    ssl: shouldUseSSL,
+    isVercel,
+    isSupabase,
+  });
 }
 
 module.exports = sequelize;
