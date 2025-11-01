@@ -232,16 +232,63 @@ app.get('/health/db', async (_req, res) => {
   try {
     const sequelize = require('./models/sequelize');
     await sequelize.authenticate();
+    
+    // Try to extract connection info from sequelize config
+    const config = sequelize.config || {};
+    const dialectOpts = config.dialectOptions || {};
+    
+    // Parse connection string if available (hide password)
+    const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.PGURI || '';
+    let safeUrl = 'not set';
+    let parsedHost = 'unknown';
+    let parsedDatabase = 'unknown';
+    
+    if (dbUrl) {
+      try {
+        const url = new URL(dbUrl);
+        parsedHost = url.hostname;
+        parsedDatabase = url.pathname?.replace('/', '') || 'unknown';
+        safeUrl = dbUrl.replace(/:[^:@]+@/, ':****@');
+      } catch (e) {
+        safeUrl = 'malformed';
+      }
+    }
+    
     res.json({ 
       status: 'ok', 
       message: 'Database connection successful',
-      config: {
-        host: process.env.DB_HOST || process.env.PGHOST || 'not set',
-        database: process.env.DB_NAME || process.env.PGDATABASE || 'not set',
-        user: process.env.DB_USER || process.env.PGUSER || 'not set',
+      connection: {
+        method: dbUrl ? 'connection string' : 'individual variables',
+        url: safeUrl,
+        host: parsedHost,
+        database: parsedDatabase,
+        port: config.port || 5432,
+        ssl: {
+          enabled: !!dialectOpts.ssl,
+          require: dialectOpts.ssl?.require || false,
+          rejectUnauthorized: dialectOpts.ssl?.rejectUnauthorized !== undefined ? dialectOpts.ssl.rejectUnauthorized : 'unknown',
+        }
       }
     });
   } catch (error) {
+    // Parse connection info even on error
+    const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.PGURI || '';
+    let safeUrl = 'not set';
+    let parsedHost = 'unknown';
+    let parsedDatabase = 'unknown';
+    
+    if (dbUrl) {
+      try {
+        const url = new URL(dbUrl);
+        parsedHost = url.hostname;
+        parsedDatabase = url.pathname?.replace('/', '') || 'unknown';
+        safeUrl = dbUrl.replace(/:[^:@]+@/, ':****@');
+      } catch (e) {
+        safeUrl = 'malformed';
+        parsedHost = 'parse error';
+      }
+    }
+    
     res.status(500).json({ 
       status: 'error', 
       message: 'Database connection failed',
@@ -253,11 +300,13 @@ app.get('/health/db', async (_req, res) => {
         syscall: error.parent?.syscall,
         hostname: error.parent?.hostname,
       },
-      config: {
-        host: process.env.DB_HOST || process.env.PGHOST || 'NOT SET',
-        database: process.env.DB_NAME || process.env.PGDATABASE || 'NOT SET',
-        user: process.env.DB_USER || process.env.PGUSER || 'NOT SET',
-        ssl: process.env.PGSSL || process.env.DB_SSL || 'not set',
+      connection: {
+        method: dbUrl ? 'connection string' : 'individual variables',
+        url: safeUrl,
+        host: parsedHost,
+        database: parsedDatabase,
+        urlSet: !!dbUrl,
+        note: dbUrl ? 'Using DATABASE_URL/POSTGRES_URL/PGURI' : 'DATABASE_URL not set - using individual variables'
       }
     });
   }
