@@ -98,6 +98,26 @@ if (DB_TYPE === 'mysql') {
     });
   }
 
+  // ALWAYS enable SSL for Supabase - configure it properly
+  // For Supabase and Vercel, SSL is mandatory
+  const postgresDialectOptions = {
+    ssl: {
+      require: true,
+      rejectUnauthorized: false
+    }
+  };
+
+  // Log what we're actually passing to Sequelize
+  if (isVercel || process.env.NODE_ENV !== 'production') {
+    console.log('[Sequelize] Creating PostgreSQL connection with:', {
+      host: dbHost,
+      port: process.env.PGPORT || 5432,
+      database: dbName,
+      user: dbUser,
+      dialectOptions: postgresDialectOptions,
+    });
+  }
+
   sequelize = new Sequelize(
     dbName,
     dbUser,
@@ -108,10 +128,34 @@ if (DB_TYPE === 'mysql') {
       dialect: 'postgres',
       logging: false,
       pool: poolConfig,
-      dialectOptions: {ssl: { rejectUnauthorized: false }},
+      dialectOptions: postgresDialectOptions, // SSL ALWAYS enabled for Supabase/Vercel
       dialectModule: require('pg'),
     }
   );
+
+  // Verify the connection config after creation
+  if (isVercel || process.env.NODE_ENV !== 'production') {
+    try {
+      console.log('[Sequelize] Connection instance created. Config:', {
+        hasDialectOptions: !!sequelize.config.dialectOptions,
+        sslConfig: sequelize.config.dialectOptions?.ssl,
+        sslRequired: sequelize.config.dialectOptions?.ssl?.require,
+        host: sequelize.config.host,
+      });
+    } catch (e) {
+      console.error('[Sequelize] Error logging config:', e.message);
+    }
+  }
+
+  // Add connection error handler to catch SSL-related errors
+  sequelize.connectionManager.pool.on('error', (err) => {
+    console.error('[Sequelize] Pool error:', {
+      name: err.name,
+      message: err.message,
+      code: err.code,
+      errno: err.errno,
+    });
+  });
 }
 
 // Log connection configuration (without sensitive data) for debugging
