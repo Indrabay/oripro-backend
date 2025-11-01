@@ -1,16 +1,16 @@
 {
   "postgres": {
-    "username": "changeme",
-    "password": "changeme",
-    "database": "changeme",
-    "host": "changeme",
-    "dialect": "changeme"
+    "username": "postgres",
+    "password": "CjU8yFMqr@Hr38/",
+    "database": "postgres",
+    "host": "db.hsabnljpkotemamfalmd.supabase.co",
+    "dialect": "postgres"
   },
   "mysql": {
-    "username": "changeme",
-    "password": "changeme",
-    "database": "changeme",
-    "host": "changeme",
-    "dialect": "changeme"
+    "username": "root",
+    "password": "root",
+    "database": "oripro",
+    "host": "127.0.0.1",
+    "dialect": "mysql"
   }
 }

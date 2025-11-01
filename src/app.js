@@ -226,6 +226,42 @@ app.use(
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
+
+// Database connection test endpoint (for debugging)
+app.get('/health/db', async (_req, res) => {
+  try {
+    const sequelize = require('./models/sequelize');
+    await sequelize.authenticate();
+    res.json({ 
+      status: 'ok', 
+      message: 'Database connection successful',
+      config: {
+        host: process.env.DB_HOST || process.env.PGHOST || 'not set',
+        database: process.env.DB_NAME || process.env.PGDATABASE || 'not set',
+        user: process.env.DB_USER || process.env.PGUSER || 'not set',
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'error', 
+      message: 'Database connection failed',
+      error: {
+        name: error.name,
+        message: error.message,
+        code: error.parent?.code,
+        errno: error.parent?.errno,
+        syscall: error.parent?.syscall,
+        hostname: error.parent?.hostname,
+      },
+      config: {
+        host: process.env.DB_HOST || process.env.PGHOST || 'NOT SET',
+        database: process.env.DB_NAME || process.env.PGDATABASE || 'NOT SET',
+        user: process.env.DB_USER || process.env.PGUSER || 'NOT SET',
+        ssl: process.env.PGSSL || process.env.DB_SSL || 'not set',
+      }
+    });
+  }
+});
 app.use(express.static(path.join(__dirname, '../public'), {
   setHeaders: (res, path) => {
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
