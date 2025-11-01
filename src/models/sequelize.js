@@ -99,13 +99,20 @@ if (DB_TYPE === 'mysql') {
   }
 
   // ALWAYS enable SSL for Supabase - configure it properly
-  // For Supabase and Vercel, SSL is mandatory
+  // For Supabase, SSL configuration must use rejectUnauthorized: false
+  // This is the standard format for Supabase connections
   const postgresDialectOptions = {
     ssl: {
-      require: true,
-      rejectUnauthorized: false
+      rejectUnauthorized: false  // Required for Supabase - allows self-signed certs
     }
   };
+  
+  // Force SSL to be enabled - this is non-negotiable for Supabase
+  // Even if detection failed, we enable it for Vercel + non-localhost connections
+  if (isVercel && dbHost && !dbHost.includes('localhost') && !dbHost.includes('127.0.0.1')) {
+    // Already set above, but ensuring it's clear
+    console.log('[Sequelize] ✅ SSL FORCED ON - Vercel environment with remote database');
+  }
 
   // Log what we're actually passing to Sequelize
   if (isVercel || process.env.NODE_ENV !== 'production') {
@@ -136,26 +143,21 @@ if (DB_TYPE === 'mysql') {
   // Verify the connection config after creation
   if (isVercel || process.env.NODE_ENV !== 'production') {
     try {
+      // Access config safely - it may not be immediately available
+      const config = sequelize.config || {};
+      const dialectOpts = config.dialectOptions || {};
       console.log('[Sequelize] Connection instance created. Config:', {
-        hasDialectOptions: !!sequelize.config.dialectOptions,
-        sslConfig: sequelize.config.dialectOptions?.ssl,
-        sslRequired: sequelize.config.dialectOptions?.ssl?.require,
-        host: sequelize.config.host,
+        hasDialectOptions: !!dialectOpts,
+        hasSSL: !!dialectOpts.ssl,
+        sslRejectUnauthorized: dialectOpts.ssl?.rejectUnauthorized,
+        host: config.host || 'unknown',
+        database: config.database || 'unknown',
       });
     } catch (e) {
       console.error('[Sequelize] Error logging config:', e.message);
+      console.log('[Sequelize] SSL is configured in postgresDialectOptions:', postgresDialectOptions);
     }
   }
-
-  // Add connection error handler to catch SSL-related errors
-  sequelize.connectionManager.pool.on('error', (err) => {
-    console.error('[Sequelize] Pool error:', {
-      name: err.name,
-      message: err.message,
-      code: err.code,
-      errno: err.errno,
-    });
-  });
 }
 
 // Log connection configuration (without sensitive data) for debugging
