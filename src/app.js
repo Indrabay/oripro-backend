@@ -261,8 +261,25 @@ app.use((_req, res) => {
 // Global error handler
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
-  console.error(err);
-  res.status(err.status || 500).json({ message: err.message || 'Internal Server Error' });
+  // Log the full error for debugging
+  console.error('Unhandled error:', err);
+  
+  // Ensure we never send headers after they've been sent
+  if (res.headersSent) {
+    return _next(err);
+  }
+  
+  // Send error response
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || 'Internal Server Error';
+  res.status(status).json({ message });
+});
+
+// Handle unhandled promise rejections globally
+// This is critical for Vercel serverless functions
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit the process, but log it
 });
 
 // Only start server when not running on Vercel

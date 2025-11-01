@@ -23,37 +23,44 @@ function InitAssetRouter(AssetUsecase) {
   router.post("/", uploadMiddleware, createAssetParam, createAsset);
 
   router.get("/", async (req, res) => {
-    let { name, asset_type, order, limit, offset } = req.query;
-    if (!limit) limit = 10;
-    if (!offset) offset = 0;
+    try {
+      let { name, asset_type, order, limit, offset } = req.query;
+      if (!limit) limit = 10;
+      if (!offset) offset = 0;
 
-    req.log?.info({}, "route_assets_list");
-    const assets = await AssetUsecase.listAssets(
-      {
-        name,
-        asset_type,
-        order,
-        limit,
-        offset,
-      },
-      {
-        requestId: req.requestId,
-        log: req.log,
-        roleName: req.auth.roleName,
-        userId: req.auth.userId,
-      }
-    );
-    return res
-      .status(200)
-      .json(
-        createResponse(
-          assets.assets,
-          "Assets fetched successfully",
-          200,
-          true,
-          { total: assets.total, limit: limit, offset: offset }
-        )
+      req.log?.info({}, "route_assets_list");
+      const assets = await AssetUsecase.listAssets(
+        {
+          name,
+          asset_type,
+          order,
+          limit,
+          offset,
+        },
+        {
+          requestId: req.requestId,
+          log: req.log,
+          roleName: req.auth.roleName,
+          userId: req.auth.userId,
+        }
       );
+      return res
+        .status(200)
+        .json(
+          createResponse(
+            assets.assets,
+            "Assets fetched successfully",
+            200,
+            true,
+            { total: assets.total, limit: limit, offset: offset }
+          )
+        );
+    } catch (error) {
+      req.log?.error(error, "route_assets_list_error");
+      return res
+        .status(500)
+        .json(createResponse(null, "internal server error", 500));
+    }
   });
 
   router.get("/:id", [param("id").isString().notEmpty()], getDetailAsset);
