@@ -31,17 +31,33 @@ if (!dbHost) {
   });
 }
 
-const isSupabase = dbHost.includes('.supabase.co');
+// Check if this is a Supabase connection (multiple checks for reliability)
+const isSupabase = dbHost && (
+  dbHost.includes('.supabase.co') || 
+  dbHost.includes('supabase') ||
+  (isVercel && dbHost.match(/db\.[a-z0-9]+\.supabase/))
+);
 
 // Enable SSL if explicitly set, or if detected Supabase hostname
 // Supabase ALWAYS requires SSL for external connections
-const shouldUseSSL = process.env.DB_SSL === 'true' || 
-                     process.env.PGSSL === 'true' || 
-                     isSupabase ||
-                     (isVercel && dbHost && !dbHost.includes('localhost') && !dbHost.includes('127.0.0.1'));
+// Priority: explicit setting > Supabase detection > Vercel + non-localhost
+const shouldUseSSL = 
+  process.env.DB_SSL === 'true' || 
+  process.env.PGSSL === 'true' || 
+  isSupabase || // Supabase ALWAYS requires SSL - this is mandatory
+  (isVercel && dbHost && dbHost.length > 0 && !dbHost.includes('localhost') && !dbHost.includes('127.0.0.1'));
+
+// FORCE SSL for Supabase connections - this is non-negotiable
+// If Supabase is detected but SSL logic failed, override it
+let finalShouldUseSSL = shouldUseSSL;
+if (isSupabase && !finalShouldUseSSL) {
+  console.warn('[Sequelize] ⚠️  WARNING: Supabase detected but SSL was not enabled! Forcing SSL...');
+  finalShouldUseSSL = true;
+}
 
 // Set dialect options with SSL when needed
-const dialectOptions = shouldUseSSL
+// Use finalShouldUseSSL to ensure Supabase always gets SSL
+const dialectOptions = finalShouldUseSSL
   ? {
       // SSL configuration for managed databases (Supabase, AWS RDS, etc.)
       ssl: { rejectUnauthorized: false } // Required for Supabase and most cloud databases
@@ -101,6 +117,24 @@ if (DB_TYPE === 'mysql') {
 // Log connection configuration (without sensitive data) for debugging
 // Always log in Vercel to help debug connection issues
 if (isVercel || process.env.NODE_ENV !== 'production') {
+  // Log SSL configuration first
+  console.log('[Sequelize] SSL Configuration:', {
+    shouldUseSSL: finalShouldUseSSL,
+    reason: isSupabase ? '✅ Supabase detected (MANDATORY)' : 
+            process.env.DB_SSL === 'true' || process.env.PGSSL === 'true' ? '✅ Explicitly set' :
+            isVercel && dbHost && !dbHost.includes('localhost') ? '✅ Vercel + non-localhost' :
+            '❌ Not needed',
+    isSupabase,
+    isVercel,
+    dbHost: dbHost ? `${dbHost.substring(0, 40)}` : 'empty',
+  });
+  
+  if (isSupabase && !finalShouldUseSSL) {
+    console.error('[Sequelize] ❌ CRITICAL ERROR: Supabase detected but SSL is disabled!');
+    console.error('[Sequelize] This will cause connection failures. SSL should be enabled.');
+  }
+  
+  // Log full database configuration
   console.log('[Sequelize] Database configuration:', {
     dialect: DB_TYPE,
     host: dbHost || '⚠️ NOT SET - This will cause ENOTFOUND errors!',
@@ -108,7 +142,7 @@ if (isVercel || process.env.NODE_ENV !== 'production') {
     database: dbName || '⚠️ NOT SET',
     user: dbUser || '⚠️ NOT SET',
     password: dbPassword ? '***set***' : '⚠️ NOT SET',
-    ssl: shouldUseSSL,
+    ssl: finalShouldUseSSL ? '✅ ENABLED' : '❌ DISABLED',
     isVercel,
     isSupabase,
     hasAllRequiredVars: !!(dbHost && dbUser && dbName && dbPassword),
