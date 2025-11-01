@@ -108,7 +108,7 @@ if (DB_TYPE === 'mysql') {
       dialect: 'postgres',
       logging: false,
       pool: poolConfig,
-      dialectOptions,
+      dialectOptions: {ssl: { rejectUnauthorized: false }},
       dialectModule: require('pg'),
     }
   );
