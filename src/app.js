@@ -197,7 +197,7 @@ const userTaskRouter = require('./routes/userTasks').InitUserTaskRouter(userTask
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001'],
+  origin: ['http://localhost:3000', 'http://localhost:3001', 'https://oripro-frontend-62c6vs70u-ibes-projects-97d001d5.vercel.app'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
