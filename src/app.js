@@ -227,6 +227,10 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
+app.get('/', (_req, res) => {
+  res.json({ status: 'ok' });
+});
+
 // Database connection test endpoint (for debugging)
 app.get('/health/db', async (_req, res) => {
   try {
