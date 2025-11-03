@@ -102,6 +102,7 @@ function InitTaskRouter(taskUsecase) {
     body("role_id").isInt().notEmpty(),
     body("is_all_times").isBoolean().optional(),
     body("parent_task_id").isInt().optional(),
+    body("task_group_id").isInt().optional(),
     body("days").isArray().optional(),
     body("times").isArray().optional(),
   ];
@@ -118,6 +119,7 @@ function InitTaskRouter(taskUsecase) {
     body("role_id").isInt().optional(),
     body("is_all_times").isBoolean().optional(),
     body("parent_task_id").isInt().optional(),
+    body("task_group_id").isInt().optional(),
   ];
 
   const getTaskLogsParam = [

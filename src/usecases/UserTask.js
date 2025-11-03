@@ -106,6 +106,55 @@ class UserTaskUsecase {
       throw error;
     }
   }
+
+  async getCompletedTasks(userId, queryParams, ctx) {
+    try {
+      ctx.log?.info({ userId, queryParams }, "UserTaskUsecase.getCompletedTasks");
+      
+      const { start_date, end_date, limit, offset } = queryParams;
+      
+      // Validate date format if provided
+      if (start_date && !this.isValidDate(start_date)) {
+        throw new Error('Invalid start_date format. Use YYYY-MM-DD');
+      }
+      if (end_date && !this.isValidDate(end_date)) {
+        throw new Error('Invalid end_date format. Use YYYY-MM-DD');
+      }
+      
+      // Validate date range
+      if (start_date && end_date) {
+        const start = new Date(start_date);
+        const end = new Date(end_date);
+        if (start > end) {
+          throw new Error('start_date must be before or equal to end_date');
+        }
+      }
+      
+      const result = await this.userTaskRepository.findCompletedByUserAndDateRange(
+        userId,
+        start_date,
+        end_date,
+        { limit, offset },
+        ctx
+      );
+      return result;
+    } catch (error) {
+      ctx.log?.error(
+        { userId, queryParams, error: error.message },
+        "UserTaskUsecase.getCompletedTasks_error"
+      );
+      throw error;
+    }
+  }
+
+  isValidDate(dateString) {
+    const regex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!regex.test(dateString)) {
+      return false;
+    }
+    const date = new Date(dateString);
+    return date instanceof Date && !isNaN(date);
+  }
 }
 
 module.exports = UserTaskUsecase;

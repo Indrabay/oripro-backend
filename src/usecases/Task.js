@@ -23,6 +23,7 @@ class TaskUsecase {
           role_id: data.role_id,
           is_all_times: data.is_all_times,
           parent_task_id: data.parent_task_id,
+          task_group_id: data.task_group_id || null,
           created_by: ctx.userId,
         };
         console.log("im here2")
@@ -95,6 +96,7 @@ class TaskUsecase {
         if (data.role_id !== undefined) updateData.role_id = data.role_id;
         if (data.is_all_times !== undefined) updateData.is_all_times = data.is_all_times;
         if (data.parent_task_id !== undefined) updateData.parent_task_id = data.parent_task_id;
+        if (data.task_group_id !== undefined) updateData.task_group_id = data.task_group_id;
 
         const task = await this.taskRepository.update(id, updateData, ctx, t);
 

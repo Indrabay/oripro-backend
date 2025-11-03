@@ -47,6 +47,7 @@ const UserAssetRepository = require('./repositories/UserAsset');
 const TaskRepository = require('./repositories/Task');
 const TaskScheduleRepository = require('./repositories/TaskSchedule');
 const TaskLogRepository = require('./repositories/TaskLog');
+const TaskGroupRepository = require('./repositories/TaskGroup');
 const ScanInfoRepository = require('./repositories/ScanInfo');
 const UserTaskRepository = require('./repositories/UserTask');
 const UserTaskEvidenceRepository = require('./repositories/UserTaskEvidence');
@@ -90,7 +91,8 @@ const modelTask = require('./models/Task');
 const modelTaskSchedule = require('./models/TaskSchedule');
 const modelTaskLog = require('./models/TaskLog');
 const modelScanInfo = require('./models/ScanInfo');
-const modelUserTask = require('./models/UserTask');
+const modelTaskGroup = require('./models/TaskGroup');
+const { UserTask: modelUserTask } = require('./models/UserTask');
 const modelUserTaskEvidence = require('./models/UserTaskEvidence');
 
 // initialize repository
@@ -113,11 +115,12 @@ const userLogRepository = new UserLogRepository(modelUserLog, User, modelRole)
 const unitLogRepository = new UnitLogRepository(modelUnitLog, User)
 const tenantLogRepository = new TenantLogRepository(modelTenantLog, User);
 const userAssetRepository = new UserAssetRepository(modelUserAsset);
-const taskRepository = new TaskRepository(modelTask, User, modelRole, Asset);
+const taskRepository = new TaskRepository(modelTask, User, modelRole, Asset, modelTaskGroup);
 const taskScheduleRepository = new TaskScheduleRepository(modelTaskSchedule);
 const taskLogRepository = new TaskLogRepository(modelTaskLog, User);
+const taskGroupRepository = new TaskGroupRepository(modelTaskGroup);
 const scanInfoRepository = new ScanInfoRepository(modelScanInfo, User, Asset);
-const userTaskRepository = new UserTaskRepository(modelUserTask, User, modelTask, modelUserTaskEvidence, modelTaskSchedule);
+const userTaskRepository = new UserTaskRepository(modelUserTask, User, modelTask, modelUserTaskEvidence, modelTaskSchedule, modelTaskGroup);
 const userTaskEvidenceRepository = new UserTaskEvidenceRepository(modelUserTaskEvidence, modelUserTask);
 
 // Setup model associations
@@ -146,6 +149,7 @@ const models = {
   TaskSchedule: modelTaskSchedule,
   TaskLog: modelTaskLog,
   ScanInfo: modelScanInfo,
+  TaskGroup: modelTaskGroup,
   UserTask: modelUserTask,
   UserTaskEvidence: modelUserTaskEvidence,
 };

@@ -1,9 +1,10 @@
 class TaskRepository {
-  constructor(taskModel, userModel, roleModel, assetModel) {
+  constructor(taskModel, userModel, roleModel, assetModel, taskGroupModel) {
     this.taskModel = taskModel;
     this.userModel = userModel;
     this.roleModel = roleModel;
     this.assetModel = assetModel;
+    this.taskGroupModel = taskGroupModel;
   }
 
   async create(transaction = null, data, ctx) {
@@ -36,7 +37,13 @@ class TaskRepository {
             model: this.assetModel,
             as: 'asset',
             attributes: ['id', 'name', 'code']
-          }
+          },
+          ...(this.taskGroupModel ? [{
+            model: this.taskGroupModel,
+            as: 'taskGroup',
+            attributes: ['id', 'name', 'start_time', 'end_time', 'description'],
+            required: false
+          }] : [])
         ]
       });
       return task;

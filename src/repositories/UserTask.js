@@ -1,26 +1,36 @@
 const { Op } = require("sequelize");
 const moment = require("moment-timezone");
+const { UserTaskStatusStrToInt, UserTaskStatusIntToStr } = require("../models/UserTask");
 
 class UserTaskRepository {
-  constructor(userTaskModel, userModel, taskModel, userTaskEvidenceModel, taskScheduleModel) {
+  constructor(userTaskModel, userModel, taskModel, userTaskEvidenceModel, taskScheduleModel, taskGroupModel) {
     this.userTaskModel = userTaskModel;
     this.userModel = userModel;
     this.taskModel = taskModel;
     this.userTaskEvidenceModel = userTaskEvidenceModel;
     this.taskScheduleModel = taskScheduleModel;
+    this.taskGroupModel = taskGroupModel;
   }
 
   async create(data, ctx = {}, tx = null) {
     try {
       ctx.log?.info(data, 'UserTaskRepository.create');
+      const statusStr = data.status || 'pending';
+      const statusInt = UserTaskStatusStrToInt[statusStr] !== undefined 
+        ? UserTaskStatusStrToInt[statusStr] 
+        : UserTaskStatusStrToInt['pending'];
       const userTask = await this.userTaskModel.create({
         task_id: data.task_id,
         user_id: data.user_id,
         start_at: data.start_at,
         completed_at: data.completed_at,
         notes: data.notes,
+        status: statusInt,
       }, { transaction: tx });
-      return userTask.toJSON();
+      const userTaskJson = userTask.toJSON();
+      // Convert status from integer to string for response
+      userTaskJson.status = UserTaskStatusIntToStr[userTaskJson.status] || 'pending';
+      return userTaskJson;
     } catch (error) {
       ctx.log?.error({ data, error }, 'UserTaskRepository.create_error');
       throw error;
@@ -49,7 +59,13 @@ class UserTaskRepository {
           }
         ]
       });
-      return userTask;
+      if (!userTask) return null;
+      const userTaskJson = userTask.toJSON();
+      // Convert status from integer to string for response
+      if (userTaskJson.status !== undefined) {
+        userTaskJson.status = UserTaskStatusIntToStr[userTaskJson.status] || 'pending';
+      }
+      return userTaskJson;
     } catch (error) {
       ctx.log?.error({ id, error }, 'UserTaskRepository.findById_error');
       throw error;
@@ -83,7 +99,14 @@ class UserTaskRepository {
       });
 
       return {
-        userTasks: rows.map(ut => ut.toJSON()),
+        userTasks: rows.map(ut => {
+          const utJson = ut.toJSON();
+          // Convert status from integer to string for response
+          if (utJson.status !== undefined) {
+            utJson.status = UserTaskStatusIntToStr[utJson.status] || 'pending';
+          }
+          return utJson;
+        }),
         total: count,
         limit: parseInt(limit),
         offset: parseInt(offset),
@@ -104,6 +127,7 @@ class UserTaskRepository {
       const userTasks = await this.userTaskModel.findAll({
         where: {
           user_id: userId,
+          status: UserTaskStatusStrToInt['pending'], // Not started yet
           start_at: null, // Not started yet
           completed_at: null, // Not completed yet
           created_at: {
@@ -125,7 +149,14 @@ class UserTaskRepository {
         ]
       });
 
-      return userTasks.map(ut => ut.toJSON());
+      return userTasks.map(ut => {
+        const utJson = ut.toJSON();
+        // Convert status from integer to string for response
+        if (utJson.status !== undefined) {
+          utJson.status = UserTaskStatusIntToStr[utJson.status] || 'pending';
+        }
+        return utJson;
+      });
     } catch (error) {
       ctx.log?.error({ userId, hoursAhead, error }, 'UserTaskRepository.getUpcomingTasks_error');
       throw error;
@@ -140,6 +171,12 @@ class UserTaskRepository {
         ...data,
         updated_at: now,
       };
+      // Convert status from string to integer if provided
+      if (updateData.status && typeof updateData.status === 'string') {
+        updateData.status = UserTaskStatusStrToInt[updateData.status] !== undefined 
+          ? UserTaskStatusStrToInt[updateData.status] 
+          : UserTaskStatusStrToInt['pending'];
+      }
       await this.userTaskModel.update(updateData, {
         where: { id },
         transaction: tx
@@ -158,6 +195,7 @@ class UserTaskRepository {
       const now = moment().tz('Asia/Jakarta').toDate();
       await this.userTaskModel.update({
         start_at: now,
+        status: UserTaskStatusStrToInt['inprogress'],
         updated_at: now,
       }, {
         where: { id },
@@ -177,6 +215,7 @@ class UserTaskRepository {
       const now = moment().tz('Asia/Jakarta').toDate();
       const updateData = {
         completed_at: now,
+        status: UserTaskStatusStrToInt['completed'],
         updated_at: now,
       };
       if (notes) {
@@ -208,6 +247,145 @@ class UserTaskRepository {
     }
   }
 
+  async findCompletedByUserAndDateRange(userId, startDate, endDate, queryParams = {}, ctx = {}) {
+    try {
+      ctx.log?.info({ userId, startDate, endDate, queryParams }, 'UserTaskRepository.findCompletedByUserAndDateRange');
+      const { limit = 10, offset = 0 } = queryParams;
+      
+      const whereClause = {
+        user_id: userId,
+        status: UserTaskStatusStrToInt['completed'],
+      };
+
+      // Filter by completed_at date range
+      if (startDate || endDate) {
+        whereClause.completed_at = {};
+        if (startDate) {
+          // Start of day for start date
+          const start = moment(startDate).tz('Asia/Jakarta').startOf('day').toDate();
+          whereClause.completed_at[Op.gte] = start;
+        }
+        if (endDate) {
+          // End of day for end date
+          const end = moment(endDate).tz('Asia/Jakarta').endOf('day').toDate();
+          whereClause.completed_at[Op.lte] = end;
+        }
+      } else {
+        // If no date range provided, require completed_at to not be null
+        whereClause.completed_at = { [Op.ne]: null };
+      }
+
+      const { rows, count } = await this.userTaskModel.findAndCountAll({
+        where: whereClause,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        order: [['completed_at', 'DESC']],
+        include: [
+          {
+            model: this.taskModel,
+            as: 'task',
+            attributes: ['id', 'name', 'duration', 'is_scan', 'scan_code']
+          },
+          {
+            model: this.userTaskEvidenceModel,
+            as: 'evidences',
+            attributes: ['id', 'evidence_type', 'file_path', 'file_name', 'description', 'created_at']
+          }
+        ]
+      });
+
+      // Calculate completion percentage
+      const completionStats = await this.getCompletionPercentage(userId, startDate, endDate, ctx);
+
+      return {
+        userTasks: rows.map(ut => {
+          const utJson = ut.toJSON();
+          // Convert status from integer to string for response
+          if (utJson.status !== undefined) {
+            utJson.status = UserTaskStatusIntToStr[utJson.status] || 'pending';
+          }
+          return utJson;
+        }),
+        total: count,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        statistics: completionStats,
+      };
+    } catch (error) {
+      ctx.log?.error({ userId, startDate, endDate, queryParams, error }, 'UserTaskRepository.findCompletedByUserAndDateRange_error');
+      throw error;
+    }
+  }
+
+  async getCompletionPercentage(userId, startDate, endDate, ctx = {}) {
+    try {
+      ctx.log?.info({ userId, startDate, endDate }, 'UserTaskRepository.getCompletionPercentage');
+      
+      // Build where clause for total tasks (based on created_at if date range provided)
+      const totalWhereClause = { user_id: userId };
+      
+      // If date range provided, count tasks created in that range
+      // Otherwise, count all tasks for the user
+      if (startDate || endDate) {
+        totalWhereClause.created_at = {};
+        if (startDate) {
+          const start = moment(startDate).tz('Asia/Jakarta').startOf('day').toDate();
+          totalWhereClause.created_at[Op.gte] = start;
+        }
+        if (endDate) {
+          const end = moment(endDate).tz('Asia/Jakarta').endOf('day').toDate();
+          totalWhereClause.created_at[Op.lte] = end;
+        }
+      }
+
+      // Count total tasks
+      const totalTasks = await this.userTaskModel.count({
+        where: totalWhereClause
+      });
+
+      // Build where clause for completed tasks
+      const completedWhereClause = {
+        user_id: userId,
+        status: UserTaskStatusStrToInt['completed'],
+      };
+
+      // Filter by completed_at date range
+      if (startDate || endDate) {
+        completedWhereClause.completed_at = {};
+        if (startDate) {
+          const start = moment(startDate).tz('Asia/Jakarta').startOf('day').toDate();
+          completedWhereClause.completed_at[Op.gte] = start;
+        }
+        if (endDate) {
+          const end = moment(endDate).tz('Asia/Jakarta').endOf('day').toDate();
+          completedWhereClause.completed_at[Op.lte] = end;
+        }
+      } else {
+        completedWhereClause.completed_at = { [Op.ne]: null };
+      }
+
+      // Count completed tasks
+      const completedTasks = await this.userTaskModel.count({
+        where: completedWhereClause
+      });
+
+      // Calculate percentage
+      const percentage = totalTasks > 0 
+        ? Math.round((completedTasks / totalTasks) * 100 * 100) / 100 // Round to 2 decimal places
+        : 0;
+
+      return {
+        total_tasks: totalTasks,
+        completed_tasks: completedTasks,
+        pending_tasks: totalTasks - completedTasks,
+        completion_percentage: percentage,
+      };
+    } catch (error) {
+      ctx.log?.error({ userId, startDate, endDate, error }, 'UserTaskRepository.getCompletionPercentage_error');
+      throw error;
+    }
+  }
+
   async generateUpcomingUserTasks(userId, hoursAhead = 12, ctx = {}) {
     try {
       ctx.log?.info({ userId, hoursAhead }, 'UserTaskRepository.generateUpcomingUserTasks');
@@ -221,12 +399,52 @@ class UserTaskRepository {
         const currentDayName = dayNames[currentDay];
         const currentTime = now.format('HH:mm');
         
-        // Calculate 12 hours from now in Asia/Jakarta timezone
-        const twelveHoursFromNow = now.clone().add(hoursAhead, 'hours');
-        const endTime = twelveHoursFromNow.format('HH:mm');
+        // Find task groups that match the current time
+        const allTaskGroups = await this.taskGroupModel.findAll({
+          where: {
+            is_active: true,
+          },
+        });
+
+        // Filter task groups where current time is within start_time and end_time
+        const matchingTaskGroups = allTaskGroups.filter(tg => {
+          const tgJson = tg.toJSON();
+          const [startH, startM] = tgJson.start_time.split(':').map(Number);
+          const [endH, endM] = tgJson.end_time.split(':').map(Number);
+          const [currentH, currentM] = currentTime.split(':').map(Number);
+          
+          const startMinutes = startH * 60 + startM;
+          const endMinutes = endH * 60 + endM;
+          const currentMinutes = currentH * 60 + currentM;
+
+          // Handle time ranges that span midnight (e.g., 22:00 to 06:00)
+          if (endMinutes < startMinutes) {
+            // Range spans midnight
+            return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
+          } else {
+            // Normal range within same day
+            return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+          }
+        });
+
+        const matchingTaskGroupIds = matchingTaskGroups.map(tg => tg.id);
         
-        // Get all tasks with their schedules for today
+        // Build where clause for tasks
+        const taskWhereClause = {};
+        if (matchingTaskGroupIds.length > 0) {
+          // Only get tasks that belong to matching task groups
+          taskWhereClause[Op.or] = [
+            { task_group_id: { [Op.in]: matchingTaskGroupIds } },
+            { task_group_id: null } // Also include tasks without a task group
+          ];
+        } else {
+          // If no matching task groups, only get tasks without a task group
+          taskWhereClause.task_group_id = null;
+        }
+        
+        // Get all tasks with their schedules for today, filtered by task group
         const tasks = await this.taskModel.findAll({
+          where: taskWhereClause,
           include: [
             {
               model: this.taskScheduleModel,
@@ -253,7 +471,8 @@ class UserTaskRepository {
               user_id: userId,
               start_at: null,
               completed_at: null,
-              notes: null
+              notes: null,
+              status: 'pending'
             };
 
             const userTask = await this.create(userTaskData, ctx, t);

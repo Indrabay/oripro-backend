@@ -1,6 +1,18 @@
 const { DataTypes, Model } = require('sequelize');
 const sequelize = require('./sequelize');
 
+const UserTaskStatusStrToInt = {
+  'pending': 0,
+  'inprogress': 1,
+  'completed': 2
+}
+
+const UserTaskStatusIntToStr = {
+  0: 'pending',
+  1: 'inprogress',
+  2: 'completed'
+}
+
 class UserTask extends Model {}
 
 UserTask.init({
@@ -28,6 +40,12 @@ UserTask.init({
   notes: {
     type: DataTypes.TEXT,
     allowNull: true,
+  },
+  status: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0, // pending
+    allowNull: false,
+    comment: 'Status: 0=pending, 1=inprogress, 2=completed'
   },
   created_at: {
     type: DataTypes.DATE,
@@ -64,4 +82,4 @@ UserTask.associate = (models) => {
   });
 };
 
-module.exports = UserTask;
+module.exports = { UserTask, UserTaskStatusStrToInt, UserTaskStatusIntToStr };
