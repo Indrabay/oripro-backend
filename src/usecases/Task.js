@@ -246,6 +246,248 @@ class TaskUsecase {
     }
   }
 
+  async getTaskById(id, ctx) {
+    try {
+      ctx.log?.info({ id }, "TaskUsecase.getTaskById");
+      const task = await this.taskRepository.findById(id, ctx);
+      
+      if (!task) {
+        return null;
+      }
+    
+      const taskJson = task.toJSON ? task.toJSON() : task;
+      
+      // Get schedules using taskScheduleRepository
+      const schedules = await this.taskScheduleRepository.findByTaskId(id, ctx);
+      
+      // Extract associations before building response (to avoid circular refs)
+      const createdBy = taskJson.createdBy;
+      const role = taskJson.role;
+      const asset = taskJson.asset;
+      const taskGroup = taskJson.taskGroup;
+      const parentTaskIds = taskJson.parent_task_ids || [];
+      
+      // Remove association objects to avoid circular references
+      delete taskJson.createdBy;
+      delete taskJson.role;
+      delete taskJson.asset;
+      delete taskJson.taskGroup;
+      delete taskJson.parent_task_ids;
+      
+      // Build response with all task attributes
+      const cleanedTask = {
+        ...taskJson, // Include all task attributes (id, name, is_main_task, etc.)
+        parent_task_ids: parentTaskIds,
+        schedules: schedules
+      };
+      
+      // Process schedules to extract days and times arrays
+      const daysSet = new Set();
+      const timesSet = new Set();
+      
+      schedules.forEach(schedule => {
+        if (schedule.day_of_week && schedule.day_of_week !== 'all') {
+          daysSet.add(schedule.day_of_week);
+        }
+        if (schedule.time) {
+          timesSet.add(schedule.time);
+        }
+      });
+      
+      cleanedTask.days = Array.from(daysSet).sort();
+      cleanedTask.times = Array.from(timesSet).sort();
+      
+      // Add cleaned associations as plain objects
+      if (createdBy) {
+        cleanedTask.createdBy = {
+          id: createdBy.id,
+          name: createdBy.name,
+          email: createdBy.email
+        };
+      }
+      if (role) {
+        cleanedTask.role = {
+          id: role.id,
+          name: role.name,
+          level: role.level
+        };
+      }
+      if (asset) {
+        cleanedTask.asset = {
+          id: asset.id,
+          name: asset.name,
+          code: asset.code
+        };
+      }
+      if (taskGroup) {
+        cleanedTask.taskGroup = {
+          id: taskGroup.id,
+          name: taskGroup.name,
+          start_time: taskGroup.start_time,
+          end_time: taskGroup.end_time,
+          is_active: taskGroup.is_active
+        };
+      }
+      
+      return cleanedTask;
+    } catch (error) {
+      ctx.log?.error(
+        { id, error: error.message, errorStack: error.stack },
+        "TaskUsecase.getTaskById_error"
+      );
+      throw error;
+    }
+  }
+
+  async getAllTasks(filters = {}, ctx) {
+    try {
+      ctx.log?.info({ filters }, "TaskUsecase.getAllTasks");
+      const result = await this.taskRepository.findAll(filters, ctx);
+      
+      // Clean up associations to avoid circular references
+      const cleanedTasks = result.tasks.map(task => {
+        const cleanedTask = {
+          id: task.id,
+          name: task.name,
+          is_main_task: task.is_main_task,
+          is_need_validation: task.is_need_validation,
+          is_scan: task.is_scan,
+          scan_code: task.scan_code,
+          duration: task.duration,
+          asset_id: task.asset_id,
+          role_id: task.role_id,
+          is_all_times: task.is_all_times,
+          task_group_id: task.task_group_id,
+          created_by: task.created_by,
+          parent_task_ids: task.parent_task_ids || []
+        };
+        
+        // Extract only needed fields from associations
+        if (task.createdBy) {
+          cleanedTask.createdBy = {
+            id: task.createdBy.id,
+            name: task.createdBy.name,
+            email: task.createdBy.email
+          };
+        }
+        if (task.role) {
+          cleanedTask.role = {
+            id: task.role.id,
+            name: task.role.name,
+            level: task.role.level
+          };
+        }
+        if (task.asset) {
+          cleanedTask.asset = {
+            id: task.asset.id,
+            name: task.asset.name,
+            code: task.asset.code
+          };
+        }
+        if (task.taskGroup) {
+          cleanedTask.taskGroup = {
+            id: task.taskGroup.id,
+            name: task.taskGroup.name,
+            start_time: task.taskGroup.start_time,
+            end_time: task.taskGroup.end_time,
+            is_active: task.taskGroup.is_active
+          };
+        }
+        
+        return cleanedTask;
+      });
+      
+      return {
+        tasks: cleanedTasks,
+        total: result.total
+      };
+    } catch (error) {
+      ctx.log?.error(
+        { filters, error: error.message, errorStack: error.stack },
+        "TaskUsecase.getAllTasks_error"
+      );
+      throw error;
+    }
+  }
+
+  async deleteTask(id, ctx) {
+    try {
+      ctx.log?.info({ id }, "TaskUsecase.deleteTask");
+      const result = await sequelize.transaction(async (t) => {
+        // First check if task exists
+        const existingTask = await this.taskRepository.findById(id, ctx);
+        if (!existingTask) {
+          return null;
+        }
+
+        const taskJson = existingTask.toJSON ? existingTask.toJSON() : existingTask;
+        
+        // Create log entry before deletion
+        const logEntryData = {
+          id: id,
+          name: taskJson.name,
+          is_main_task: taskJson.is_main_task,
+          is_need_validation: taskJson.is_need_validation,
+          is_scan: taskJson.is_scan,
+          scan_code: taskJson.scan_code,
+          duration: taskJson.duration,
+          asset_id: taskJson.asset_id,
+          role_id: taskJson.role_id,
+          is_all_times: taskJson.is_all_times,
+          parent_task_id: null // Will be set from parent relations
+        };
+        
+        // Get parent_task_id from junction table for logging (use first parent if multiple)
+        let parentTaskIdForLog = null;
+        if (this.taskParentRepository) {
+          const parentTaskIds = await this.taskParentRepository.getParentTaskIds(id, ctx);
+          if (parentTaskIds && parentTaskIds.length > 0) {
+            parentTaskIdForLog = parentTaskIds[0];
+            logEntryData.parent_task_id = parentTaskIdForLog;
+          }
+        }
+        
+        // Create log entry
+        try {
+          await this.taskLogRepository.create(logEntryData, ctx, t);
+        } catch (logError) {
+          ctx.log?.error({ 
+            id, 
+            error: logError.message, 
+            errorStack: logError.stack 
+          }, "TaskUsecase.deleteTask_create_log_error");
+          // Don't throw - continue with deletion even if log fails
+        }
+
+        // Delete related data first
+        // Delete task schedules
+        await this.taskScheduleRepository.deleteByTaskId(id, ctx, t);
+        
+        // Delete parent relationships (where this task is a child)
+        if (this.taskParentRepository) {
+          await this.taskParentRepository.deleteByChildTask(id, ctx, t);
+        }
+        
+        // Delete parent relationships (where this task is a parent)
+        if (this.taskParentRepository) {
+          await this.taskParentRepository.deleteByParentTask(id, ctx, t);
+        }
+        
+        // Delete the task itself
+        const deleted = await this.taskRepository.delete(id, ctx, t);
+        
+        return deleted;
+      });
+      return result;
+    } catch (error) {
+      ctx.log?.error(
+        { id, error: error.message, errorStack: error.stack },
+        "TaskUsecase.deleteTask_error"
+      );
+      throw error;
+    }
+  }
+
   async getTaskLogs(id, ctx) {
     try {
       ctx.log?.info({ id }, "TaskUsecase.getTaskLogs");

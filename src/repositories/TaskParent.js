@@ -74,6 +74,20 @@ class TaskParentRepository {
       throw error;
     }
   }
+
+  async deleteByParentTask(parentTaskId, ctx = {}, tx = null) {
+    try {
+      ctx.log?.info({ parentTaskId }, 'TaskParentRepository.deleteByParentTask');
+      await this.taskParentModel.destroy({
+        where: { parent_task_id: parentTaskId },
+        transaction: tx
+      });
+      return true;
+    } catch (error) {
+      ctx.log?.error({ parentTaskId, error }, 'TaskParentRepository.deleteByParentTask_error');
+      throw error;
+    }
+  }
 }
 
 module.exports = TaskParentRepository;
