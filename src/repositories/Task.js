@@ -1,9 +1,11 @@
 class TaskRepository {
-  constructor(taskModel, userModel, roleModel, assetModel) {
+  constructor(taskModel, userModel, roleModel, assetModel, taskGroupModel, taskParentModel) {
     this.taskModel = taskModel;
     this.userModel = userModel;
     this.roleModel = roleModel;
     this.assetModel = assetModel;
+    this.taskGroupModel = taskGroupModel;
+    this.taskParentModel = taskParentModel;
   }
 
   async create(transaction = null, data, ctx) {
@@ -39,6 +41,20 @@ class TaskRepository {
           }
         ]
       });
+      
+      // Add parent_task_ids array if task exists and taskParentModel is available
+      if (task && this.taskParentModel) {
+        const { Op } = require('sequelize');
+        const parentRelations = await this.taskParentModel.findAll({
+          where: { child_task_id: id },
+          attributes: ['parent_task_id']
+        });
+        const parentTaskIds = parentRelations.map(rel => rel.parent_task_id);
+        const taskJson = task.toJSON ? task.toJSON() : task;
+        taskJson.parent_task_ids = parentTaskIds;
+        return { ...task, parent_task_ids: parentTaskIds };
+      }
+      
       return task;
     } catch (error) {
       ctx.log?.error({ id, error }, "TaskRepository.findById_error");

@@ -17,6 +17,26 @@ class UserTaskUsecase {
         { error: error.message },
         "UserTaskUsecase.generateUpcomingUserTasks_error"
       );
+      // Re-throw with custom error for already generated tasks
+      if (error.message.includes('already been generated')) {
+        const customError = new Error(error.message);
+        customError.statusCode = 409; // Conflict
+        throw customError;
+      }
+      throw error;
+    }
+  }
+
+  async getUserTaskByCode(code, ctx) {
+    try {
+      ctx.log?.info({ code }, "UserTaskUsecase.getUserTaskByCode");
+      const userTask = await this.userTaskRepository.findByCode(code, ctx);
+      return userTask;
+    } catch (error) {
+      ctx.log?.error(
+        { code, error: error.message },
+        "UserTaskUsecase.getUserTaskByCode_error"
+      );
       throw error;
     }
   }

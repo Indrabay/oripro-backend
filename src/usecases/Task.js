@@ -1,10 +1,11 @@
 const sequelize = require("../models/sequelize");
 
 class TaskUsecase {
-  constructor(taskRepository, taskScheduleRepository, taskLogRepository) {
+  constructor(taskRepository, taskScheduleRepository, taskLogRepository, taskParentRepository) {
     this.taskRepository = taskRepository;
     this.taskScheduleRepository = taskScheduleRepository;
     this.taskLogRepository = taskLogRepository;
+    this.taskParentRepository = taskParentRepository;
   }
 
   async createTask(data, ctx) {
@@ -22,25 +23,33 @@ class TaskUsecase {
           asset_id: data.asset_id,
           role_id: data.role_id,
           is_all_times: data.is_all_times,
-          parent_task_id: data.parent_task_id,
+          task_group_id: data.task_group_id || null,
           created_by: ctx.userId,
         };
-        console.log("im here2")
         const task = await this.taskRepository.create(t, createData, ctx);
-        console.log("im here3")
+        
+        // Handle multiple parent tasks using junction table
+        if (task && data.parent_task_ids && Array.isArray(data.parent_task_ids) && data.parent_task_ids.length > 0) {
+          await this.taskParentRepository.createMany(task.id, data.parent_task_ids, ctx, t);
+        }
+        
         if (task) {
-          console.log("im here4")
-          let taskScheduleData = {
+          const baseScheduleData = {
             task_id: task.id,
             created_by: ctx.userId,
           };
+
           if (data.days && data.days.length > 0) {
+            // Days provided: use current logic
             for (let i = 0; i < data.days.length; i++) {
-              taskScheduleData.day_of_week = data.days[i];
+              const dayOfWeek = data.days[i];
               if (data.times && data.times.length > 0) {
                 for (let j = 0; j < data.times.length; j++) {
-                  taskScheduleData.time = data.times[j];
-
+                  const taskScheduleData = {
+                    ...baseScheduleData,
+                    day_of_week: dayOfWeek,
+                    time: data.times[j],
+                  };
                   await this.taskScheduleRepository.create(
                     t,
                     taskScheduleData,
@@ -48,6 +57,10 @@ class TaskUsecase {
                   );
                 }
               } else {
+                const taskScheduleData = {
+                  ...baseScheduleData,
+                  day_of_week: dayOfWeek,
+                };
                 await this.taskScheduleRepository.create(
                   t,
                   taskScheduleData,
@@ -56,8 +69,27 @@ class TaskUsecase {
               }
             }
           } else {
-            taskScheduleData.day_of_week = "all";
-            await this.taskScheduleRepository.create(t, taskScheduleData, ctx);
+            // Days empty: create for all times with day_of_week = "all"
+            if (data.times && data.times.length > 0) {
+              for (let j = 0; j < data.times.length; j++) {
+                const taskScheduleData = {
+                  ...baseScheduleData,
+                  day_of_week: "all",
+                  time: data.times[j],
+                };
+                await this.taskScheduleRepository.create(
+                  t,
+                  taskScheduleData,
+                  ctx
+                );
+              }
+            } else {
+              const taskScheduleData = {
+                ...baseScheduleData,
+                day_of_week: "all",
+              };
+              await this.taskScheduleRepository.create(t, taskScheduleData, ctx);
+            }
           }
         }
 
@@ -94,12 +126,35 @@ class TaskUsecase {
         if (data.asset_id !== undefined) updateData.asset_id = data.asset_id;
         if (data.role_id !== undefined) updateData.role_id = data.role_id;
         if (data.is_all_times !== undefined) updateData.is_all_times = data.is_all_times;
-        if (data.parent_task_id !== undefined) updateData.parent_task_id = data.parent_task_id;
+        if (data.task_group_id !== undefined) updateData.task_group_id = data.task_group_id;
 
         const task = await this.taskRepository.update(id, updateData, ctx, t);
 
-        // Create log entry
-        await this.taskLogRepository.create(task, ctx, t);
+        // Handle multiple parent tasks using junction table
+        if (data.parent_task_ids !== undefined) {
+          // Delete existing parent relationships
+          await this.taskParentRepository.deleteByChildTask(id, ctx, t);
+          // Create new parent relationships if provided
+          if (Array.isArray(data.parent_task_ids) && data.parent_task_ids.length > 0) {
+            await this.taskParentRepository.createMany(id, data.parent_task_ids, ctx, t);
+          }
+        }
+
+        // Get parent_task_id from junction table for logging (use first parent if multiple)
+        let parentTaskIdForLog = null;
+        if (this.taskParentRepository) {
+          const parentTaskIds = await this.taskParentRepository.getParentTaskIds(id, ctx);
+          if (parentTaskIds && parentTaskIds.length > 0) {
+            parentTaskIdForLog = parentTaskIds[0]; // Use first parent for log
+          }
+        }
+
+        // Create log entry (pass parent_task_id from junction table)
+        const taskData = task.toJSON ? task.toJSON() : task;
+        await this.taskLogRepository.create({
+          ...taskData,
+          parent_task_id: parentTaskIdForLog
+        }, ctx, t);
 
         return task;
       });

@@ -19,6 +19,7 @@ const { InitAttendanceRouter } = require('./routes/attendances');
 const { InitRoleRouter } = require('./routes/roles');
 const { InitMenuRouter } = require('./routes/menus');
 const { InitScanInfoRouter } = require('./routes/scanInfos');
+const { InitTaskGroupRouter } = require('./routes/taskGroups');
 const { requestContext } = require('./middleware/requestContext');
 const { metricsMiddleware, metricsHandler } = require('./services/metrics');
 
@@ -47,6 +48,8 @@ const UserAssetRepository = require('./repositories/UserAsset');
 const TaskRepository = require('./repositories/Task');
 const TaskScheduleRepository = require('./repositories/TaskSchedule');
 const TaskLogRepository = require('./repositories/TaskLog');
+const TaskGroupRepository = require('./repositories/TaskGroup');
+const TaskParentRepository = require('./repositories/TaskParent');
 const ScanInfoRepository = require('./repositories/ScanInfo');
 const UserTaskRepository = require('./repositories/UserTask');
 const UserTaskEvidenceRepository = require('./repositories/UserTaskEvidence');
@@ -61,6 +64,7 @@ const roleUc = require('./usecases/Role');
 const menuUc = require('./usecases/Menu');
 const userAccessMenuUc = require('./usecases/UserAccessMenu');
 const taskUc = require('./usecases/Task');
+const taskGroupUc = require('./usecases/TaskGroup');
 const userTaskUc = require('./usecases/UserTask');
 const scanInfoUc = require('./usecases/ScanInfo');
 const attendanceUc = require('./usecases/Attendance');
@@ -90,6 +94,8 @@ const modelTask = require('./models/Task');
 const modelTaskSchedule = require('./models/TaskSchedule');
 const modelTaskLog = require('./models/TaskLog');
 const modelScanInfo = require('./models/ScanInfo');
+const modelTaskGroup = require('./models/TaskGroup');
+const modelTaskParent = require('./models/TaskParent');
 const modelUserTask = require('./models/UserTask');
 const modelUserTaskEvidence = require('./models/UserTaskEvidence');
 
@@ -113,11 +119,13 @@ const userLogRepository = new UserLogRepository(modelUserLog, User, modelRole)
 const unitLogRepository = new UnitLogRepository(modelUnitLog, User)
 const tenantLogRepository = new TenantLogRepository(modelTenantLog, User);
 const userAssetRepository = new UserAssetRepository(modelUserAsset);
-const taskRepository = new TaskRepository(modelTask, User, modelRole, Asset);
+const taskRepository = new TaskRepository(modelTask, User, modelRole, Asset, modelTaskGroup, modelTaskParent);
 const taskScheduleRepository = new TaskScheduleRepository(modelTaskSchedule);
 const taskLogRepository = new TaskLogRepository(modelTaskLog, User);
+const taskGroupRepository = new TaskGroupRepository(modelTaskGroup);
+const taskParentRepository = new TaskParentRepository(modelTaskParent);
 const scanInfoRepository = new ScanInfoRepository(modelScanInfo, User, Asset);
-const userTaskRepository = new UserTaskRepository(modelUserTask, User, modelTask, modelUserTaskEvidence, modelTaskSchedule);
+const userTaskRepository = new UserTaskRepository(modelUserTask, User, modelTask, modelUserTaskEvidence, modelTaskSchedule, modelTaskGroup, modelTaskParent);
 const userTaskEvidenceRepository = new UserTaskEvidenceRepository(modelUserTaskEvidence, modelUserTask);
 
 // Setup model associations
@@ -146,12 +154,18 @@ const models = {
   TaskSchedule: modelTaskSchedule,
   TaskLog: modelTaskLog,
   ScanInfo: modelScanInfo,
+  TaskGroup: modelTaskGroup,
+  TaskParent: modelTaskParent,
   UserTask: modelUserTask,
   UserTaskEvidence: modelUserTaskEvidence,
 };
 
 // Setup associations
 Object.keys(models).forEach(modelName => {
+  if (!models[modelName]) {
+    console.error(`Model ${modelName} is undefined!`);
+    return;
+  }
   if (models[modelName].associate) {
     models[modelName].associate(models);
   }
@@ -174,7 +188,8 @@ const tenantUsecase = new tenantUc(tenantRepository, tenantAttachmentRepository,
 const roleUsecase = new roleUc(roleRepository);
 const menuUsecase = new menuUc(menuRepository);
 const userAccessMenuUsecase = new userAccessMenuUc(userAccessMenuRepository);
-const taskUsecase = new taskUc(taskRepository, taskScheduleRepository, taskLogRepository);
+const taskUsecase = new taskUc(taskRepository, taskScheduleRepository, taskLogRepository, taskParentRepository);
+const taskGroupUsecase = new taskGroupUc(taskGroupRepository);
 const userTaskUsecase = new userTaskUc(userTaskRepository, taskRepository, taskScheduleRepository, userTaskEvidenceRepository);
 const scanInfoUsecase = new scanInfoUc(scanInfoRepository);
 const attendanceRepository = new AttendanceRepository();
@@ -191,6 +206,7 @@ const menuRouter = InitMenuRouter(menuUsecase);
 const attendanceRouter = InitAttendanceRouter(attendanceUsecase);
 const uploadFileRouter = uploadsRouter.InitUploadRouter();
 const taskRouter = taskRoute.InitTaskRouter(taskUsecase);
+const taskGroupRouter = InitTaskGroupRouter(taskGroupUsecase);
 const scanInfoRouter = InitScanInfoRouter(scanInfoUsecase);
 const userTaskRouter = require('./routes/userTasks').InitUserTaskRouter(userTaskUsecase);
 
@@ -333,6 +349,7 @@ app.use('/api/users', userRouter);
 app.use('/api/units', unitRouter);
 app.use('/api/tenants', tenantRouter);
 app.use('/api/tasks', taskRouter);
+app.use('/api/task-groups', taskGroupRouter);
 app.use('/api/roles', roleRouter);
 app.use('/api/menus', menuRouter);
 app.use('/api/uploads', uploadFileRouter);

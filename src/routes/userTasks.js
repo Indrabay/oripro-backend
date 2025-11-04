@@ -24,6 +24,14 @@ function InitUserTaskRouter(userTaskUsecase) {
       return res.status(201).json(createResponse(result, "User tasks generated successfully", 201));
     } catch (error) {
       req.log?.error(error, "UserTaskRouter.generateUpcomingUserTasks");
+      
+      // Handle conflict error (already generated)
+      if (error.statusCode === 409 || error.message.includes('already been generated')) {
+        return res
+          .status(409)
+          .json(createResponse(null, error.message || "User tasks have already been generated for this task group time range", 409));
+      }
+      
       return res
         .status(500)
         .json(createResponse(null, "internal server error", 500));
@@ -152,9 +160,52 @@ function InitUserTaskRouter(userTaskUsecase) {
     body("notes").isString().optional(),
   ];
 
+  async function getUserTaskByCode(req, res) {
+    try {
+      req.log?.info({ code: req.params.code }, "UserTaskRouter.getUserTaskByCode");
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res
+          .status(400)
+          .json(createResponse(null, "validation error", 400, errors.array()));
+      }
+      
+      const result = await userTaskUsecase.getUserTaskByCode(req.params.code, {
+        userId: req.auth?.userId,
+        log: req.log,
+      });
+      
+      if (!result) {
+        return res
+          .status(404)
+          .json(createResponse(null, "user task not found", 404));
+      }
+      
+      return res.status(200).json(createResponse(result, "success", 200));
+    } catch (error) {
+      req.log?.error(error, "UserTaskRouter.getUserTaskByCode");
+      return res
+        .status(500)
+        .json(createResponse(null, "internal server error", 500));
+    }
+  }
+
+  const getCompletedTasksParam = [
+    query("start_date").optional().matches(/^\d{4}-\d{2}-\d{2}$/).withMessage("start_date must be in YYYY-MM-DD format"),
+    query("end_date").optional().matches(/^\d{4}-\d{2}-\d{2}$/).withMessage("end_date must be in YYYY-MM-DD format"),
+    query("user_id").optional().isUUID().withMessage("user_id must be a valid UUID"),
+    query("limit").optional().isInt({ min: 1, max: 100 }).withMessage("limit must be between 1 and 100"),
+    query("offset").optional().isInt({ min: 0 }).withMessage("offset must be a non-negative integer"),
+  ];
+
+  const getUserTaskByCodeParam = [
+    param("code").isString().notEmpty().withMessage("code is required"),
+  ];
+
   router.use(authMiddleware, ensureRole);
 
   router.post("/generate-upcoming", generateUpcomingUserTasks);
+  router.get("/code/:code", getUserTaskByCodeParam, getUserTaskByCode);
   router.get("/", getUserTasksParam, getUserTasks);
   router.get("/upcoming", getUpcomingUserTasks);
   router.put("/:id/start", startUserTaskParam, startUserTask);

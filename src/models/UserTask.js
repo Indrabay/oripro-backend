@@ -1,6 +1,18 @@
 const { DataTypes, Model } = require('sequelize');
 const sequelize = require('./sequelize');
 
+const UserTaskStatusStrToInt = {
+  'pending': 0,
+  'inprogress': 1,
+  'completed': 2,
+};
+
+const UserTaskStatusIntToStr = {
+  0: 'pending',
+  1: 'inprogress',
+  2: 'completed',
+};
+
 class UserTask extends Model {}
 
 UserTask.init({
@@ -29,6 +41,27 @@ UserTask.init({
     type: DataTypes.TEXT,
     allowNull: true,
   },
+  status: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0, // pending
+    allowNull: false,
+    comment: 'Status: 0=pending, 1=inprogress, 2=completed'
+  },
+  code: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  is_main_task: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    comment: 'Indicates if this is a main user task (true) or child user task (false)'
+  },
+  parent_user_task_id: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    comment: 'Reference to parent user task if this is a child task'
+  },
   created_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
@@ -46,6 +79,9 @@ UserTask.init({
     { fields: ['user_id'] },
     { fields: ['task_id'] },
     { fields: ['user_id', 'task_id'] },
+    { fields: ['code'] },
+    { fields: ['is_main_task'] },
+    { fields: ['parent_user_task_id'] },
   ],
 });
 
@@ -62,6 +98,17 @@ UserTask.associate = (models) => {
     foreignKey: 'user_task_id',
     as: 'evidences',
   });
+  // Self-referencing association for parent-child relationship
+  UserTask.belongsTo(models.UserTask, {
+    foreignKey: 'parent_user_task_id',
+    as: 'parentUserTask',
+  });
+  UserTask.hasMany(models.UserTask, {
+    foreignKey: 'parent_user_task_id',
+    as: 'childUserTasks',
+  });
 };
 
 module.exports = UserTask;
+module.exports.UserTaskStatusIntToStr = UserTaskStatusIntToStr;
+module.exports.UserTaskStatusStrToInt = UserTaskStatusStrToInt;

@@ -101,7 +101,9 @@ function InitTaskRouter(taskUsecase) {
     body("asset_id").isUUID().notEmpty(),
     body("role_id").isInt().notEmpty(),
     body("is_all_times").isBoolean().optional(),
-    body("parent_task_id").isInt().optional(),
+    body("parent_task_ids").isArray().optional(),
+    body("parent_task_ids.*").isInt().optional(),
+    body("task_group_id").isInt().optional(),
     body("days").isArray().optional(),
     body("times").isArray().optional(),
   ];
@@ -117,7 +119,9 @@ function InitTaskRouter(taskUsecase) {
     body("asset_id").isUUID().optional(),
     body("role_id").isInt().optional(),
     body("is_all_times").isBoolean().optional(),
-    body("parent_task_id").isInt().optional(),
+    body("parent_task_ids").isArray().optional(), // Array of parent task IDs
+    body("parent_task_ids.*").isInt().optional(), // Validate each element in array
+    body("task_group_id").isInt().optional(),
   ];
 
   const getTaskLogsParam = [

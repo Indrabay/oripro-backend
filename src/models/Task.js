@@ -42,7 +42,10 @@ Task.init({
     type: DataTypes.BOOLEAN,
     defaultValue: true,
   },
-  parent_task_id: DataTypes.BIGINT,
+  task_group_id: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+  },
   created_by: {
     type: DataTypes.UUID,
     allowNull: true
@@ -74,6 +77,18 @@ Task.associate = (models) => {
   Task.hasMany(models.TaskSchedule, {
     foreignKey: 'task_id',
     as: 'schedules',
+  });
+  Task.belongsTo(models.TaskGroup, {
+    foreignKey: 'task_group_id',
+    as: 'taskGroup',
+  });
+  Task.hasMany(models.TaskParent, {
+    foreignKey: 'child_task_id',
+    as: 'parentRelations',
+  });
+  Task.hasMany(models.TaskParent, {
+    foreignKey: 'parent_task_id',
+    as: 'childRelations',
   });
 }
 
