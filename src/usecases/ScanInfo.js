@@ -101,6 +101,55 @@ class ScanInfoUsecase {
       throw error;
     }
   }
+
+  async generateQRCode(id, ctx) {
+    try {
+      ctx.log?.info({ id }, "ScanInfoUsecase.generateQRCode");
+      const scanInfo = await this.scanInfoRepository.findById(id, ctx);
+      if (!scanInfo) {
+        return null;
+      }
+
+      const QRCode = require('qrcode');
+      
+      // Convert to plain JSON to avoid circular references
+      const scanInfoJson = scanInfo.toJSON ? scanInfo.toJSON() : scanInfo;
+      
+      // Get scan_code from scanInfo
+      const scanCode = scanInfoJson.scan_code || scanInfoJson.scanCode;
+      if (!scanCode) {
+        throw new Error('Scan code not found in scan info');
+      }
+
+      // Prepare data object for QR code
+      const qrCodeData = {
+        code: scanCode,
+        latitude: scanInfoJson.latitude || null,
+        longitude: scanInfoJson.longitude || null
+      };
+
+      // Generate QR code as data URL (base64 image) with JSON data
+      const qrCodeDataUrl = await QRCode.toDataURL(JSON.stringify(qrCodeData), {
+        errorCorrectionLevel: 'M',
+        type: 'image/png',
+        quality: 0.92,
+        margin: 1,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        },
+        width: 300
+      });
+
+      return qrCodeDataUrl;
+    } catch (error) {
+      ctx.log?.error(
+        { id, error: error.message, errorStack: error.stack },
+        "ScanInfoUsecase.generateQRCode_error"
+      );
+      throw error;
+    }
+  }
 }
 
 module.exports = ScanInfoUsecase;

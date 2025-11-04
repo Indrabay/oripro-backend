@@ -153,6 +153,43 @@ function InitScanInfoRouter(scanInfoUsecase) {
     }
   }
 
+  async function generateQRCode(req, res) {
+    try {
+      req.log?.info({ id: req.params.id }, "ScanInfoRouter.generateQRCode");
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res
+          .status(400)
+          .json(createResponse(null, "validation error", 400, errors.array()));
+      }
+
+      // Disable caching to prevent 304 responses
+      res.set({
+        'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+
+      const result = await scanInfoUsecase.generateQRCode(req.params.id, {
+        userId: req.auth?.userId,
+        log: req.log,
+      });
+
+      if (!result) {
+        return res
+          .status(404)
+          .json(createResponse(null, "scan info not found", 404));
+      }
+
+      return res.status(200).json(createResponse(result, "success", 200));
+    } catch (error) {
+      req.log?.error({ error: error.message, errorStack: error.stack, id: req.params.id }, "ScanInfoRouter.generateQRCode");
+      return res
+        .status(500)
+        .json(createResponse(null, "internal server error", 500));
+    }
+  }
+
   const createScanInfoParam = [
     body("scan_code").isString().notEmpty().trim(),
     body("latitude").isFloat().optional(),
@@ -188,10 +225,15 @@ function InitScanInfoRouter(scanInfoUsecase) {
     param("id").isInt().notEmpty(),
   ];
 
+  const generateQRCodeParam = [
+    param("id").isInt().notEmpty(),
+  ];
+
   router.use(authMiddleware, ensureRole);
 
   router.post("/", createScanInfoParam, createScanInfo);
   router.get("/", listScanInfosParam, listScanInfos);
+  router.get("/:id/qr-code", generateQRCodeParam, generateQRCode); // More specific route first
   router.get("/:id", getScanInfoParam, getScanInfo);
   router.get("/scan-code/:scanCode", getScanInfosByScanCodeParam, getScanInfosByScanCode);
   router.put("/:id", updateScanInfoParam, updateScanInfo);
