@@ -5,21 +5,28 @@ class TaskLogRepository {
   }
 
   async create({ id, name, is_main_task, is_need_validation, is_scan, scan_code, duration, asset_id, role_id, is_all_times, parent_task_id }, ctx = {}, tx = null) {
-    ctx.log?.info({id}, 'TaskLogRepository.create');
-    await this.taskLogModel.create({
-      task_id: id,
-      name,
-      is_main_task,
-      is_need_validation,
-      is_scan,
-      scan_code,
-      duration,
-      asset_id,
-      role_id,
-      is_all_times,
-      parent_task_id,
-      created_by: ctx.userId
-    }, { transaction: tx});
+    try {
+      ctx.log?.info({id, name, asset_id, role_id}, 'TaskLogRepository.create');
+      const logData = {
+        task_id: id,
+        name,
+        is_main_task,
+        is_need_validation,
+        is_scan,
+        scan_code,
+        duration,
+        asset_id,
+        role_id,
+        is_all_times,
+        parent_task_id,
+        created_by: ctx.userId
+      };
+      ctx.log?.info({ logData }, 'TaskLogRepository.create_data');
+      await this.taskLogModel.create(logData, { transaction: tx});
+    } catch (error) {
+      ctx.log?.error({ id, name, error: error.message, errorStack: error.stack }, 'TaskLogRepository.create_error');
+      throw error;
+    }
   }
 
   async getByTaskID(id, ctx = {}) {

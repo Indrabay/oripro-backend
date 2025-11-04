@@ -127,6 +127,7 @@ class TaskUsecase {
         if (data.role_id !== undefined) updateData.role_id = data.role_id;
         if (data.is_all_times !== undefined) updateData.is_all_times = data.is_all_times;
         if (data.task_group_id !== undefined) updateData.task_group_id = data.task_group_id;
+        updateData.updated_by = ctx.userId;
 
         const task = await this.taskRepository.update(id, updateData, ctx, t);
 
@@ -150,18 +151,95 @@ class TaskUsecase {
         }
 
         // Create log entry (pass parent_task_id from junction table)
+        if (!id || !task) {
+          ctx.log?.error({ id, task: !!task }, "TaskUsecase.updateTask_missing_id_or_task");
+          throw new Error("Task ID or task data is missing");
+        }
+        
+        // Extract only the fields we need for the log, avoiding circular references
         const taskData = task.toJSON ? task.toJSON() : task;
-        await this.taskLogRepository.create({
-          ...taskData,
+        const logEntryData = {
+          id: id, // Explicitly set task_id (mapped from id in repository)
+          name: taskData.name,
+          is_main_task: taskData.is_main_task,
+          is_need_validation: taskData.is_need_validation,
+          is_scan: taskData.is_scan,
+          scan_code: taskData.scan_code,
+          duration: taskData.duration,
+          asset_id: taskData.asset_id,
+          role_id: taskData.role_id,
+          is_all_times: taskData.is_all_times,
           parent_task_id: parentTaskIdForLog
-        }, ctx, t);
+        };
+        
+        ctx.log?.info({ 
+          id, 
+          name: logEntryData.name, 
+          asset_id: logEntryData.asset_id, 
+          role_id: logEntryData.role_id,
+          parentTaskIdForLog 
+        }, "TaskUsecase.updateTask_creating_log");
+        
+        try {
+          await this.taskLogRepository.create(logEntryData, ctx, t);
+        } catch (logError) {
+          ctx.log?.error({ 
+            id, 
+            name: logEntryData.name,
+            error: logError.message, 
+            errorStack: logError.stack 
+          }, "TaskUsecase.updateTask_create_log_error");
+          throw logError;
+        }
 
-        return task;
+        // Convert task to plain JSON to avoid circular references in response
+        const taskJson = task.toJSON ? task.toJSON() : task;
+        // Clean up associations to plain objects to avoid circular references
+        const cleanedTask = {
+          id: taskJson.id,
+          name: taskJson.name,
+          is_main_task: taskJson.is_main_task,
+          is_need_validation: taskJson.is_need_validation,
+          is_scan: taskJson.is_scan,
+          scan_code: taskJson.scan_code,
+          duration: taskJson.duration,
+          asset_id: taskJson.asset_id,
+          role_id: taskJson.role_id,
+          is_all_times: taskJson.is_all_times,
+          task_group_id: taskJson.task_group_id,
+          created_by: taskJson.created_by,
+          parent_task_ids: taskJson.parent_task_ids || []
+        };
+        
+        // Extract only needed fields from associations to avoid circular references
+        if (taskJson.createdBy) {
+          cleanedTask.createdBy = {
+            id: taskJson.createdBy.id,
+            name: taskJson.createdBy.name,
+            email: taskJson.createdBy.email
+          };
+        }
+        if (taskJson.role) {
+          cleanedTask.role = {
+            id: taskJson.role.id,
+            name: taskJson.role.name,
+            level: taskJson.role.level
+          };
+        }
+        if (taskJson.asset) {
+          cleanedTask.asset = {
+            id: taskJson.asset.id,
+            name: taskJson.asset.name,
+            code: taskJson.asset.code
+          };
+        }
+        
+        return cleanedTask;
       });
       return result;
     } catch (error) {
       ctx.log?.error(
-        { id, data, error: error },
+        { id, data, error: error.message, errorStack: error.stack },
         "TaskUsecase.updateTask_error"
       );
       throw error;

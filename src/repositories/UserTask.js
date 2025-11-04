@@ -704,8 +704,9 @@ class UserTaskRepository {
           task_group_id: { [Op.in]: matchingTaskGroupIds }
         };
         
-        // Get all tasks with their schedules for today
+        // Get all tasks with their schedules for today - ONLY from matching task groups
         const tasks = await this.taskModel.findAll({
+          where: taskWhereClause,
           include: [
             {
               model: this.taskScheduleModel,
@@ -718,7 +719,8 @@ class UserTaskRepository {
               },
               required: true
             }
-          ]
+          ],
+          transaction: t
         });
 
         // Get task IDs to find child tasks
@@ -739,10 +741,12 @@ class UserTaskRepository {
           if (childTaskIds.length > 0) {
             // Get child tasks - include those with matching schedules OR those without schedules
             // (child tasks should be created when their parents are created)
+            // NOTE: Child tasks should be created if their parent is being created,
+            // regardless of whether the child belongs to a matching task group
             childTasks = await this.taskModel.findAll({
               where: {
-                id: { [Op.in]: childTaskIds },
-                task_group_id: { [Op.in]: matchingTaskGroupIds }
+                id: { [Op.in]: childTaskIds }
+                // Remove task_group_id filter - child tasks should be included if their parent is included
               },
               include: [
                 {
@@ -1095,6 +1099,13 @@ class UserTaskRepository {
         for (const mainTaskItem of mainTaskDataToCreate) {
           const mainUserTask = await createUserTaskWithSortData(mainTaskItem);
           
+          ctx.log?.info({ 
+            mainTaskId: mainTaskItem.userTaskData.task_id,
+            mainUserTaskId: mainUserTask.id,
+            scheduleTime: mainTaskItem.sortData.scheduleTime,
+            childTasksCount: mainTaskItem.childTasks?.length || 0
+          }, 'Creating main user task with children');
+          
           // Create child tasks for this main task if any
           if (mainTaskItem.childTasks && mainTaskItem.childTasks.length > 0) {
             for (const childTaskItem of mainTaskItem.childTasks) {
@@ -1102,7 +1113,23 @@ class UserTaskRepository {
               childTaskItem.userTaskData.parent_user_task_id = mainUserTask.id;
               childTaskItem.userTaskData.is_main_task = false; // Ensure child tasks are marked as not main
               
+              ctx.log?.info({ 
+                childTaskId: childTaskItem.userTaskData.task_id,
+                parentUserTaskId: mainUserTask.id,
+                scheduleTime: childTaskItem.sortData.scheduleTime
+              }, 'Creating child user task');
+              
               const childUserTask = await createUserTaskWithSortData(childTaskItem);
+              
+              // Verify parent_user_task_id was set correctly
+              if (!childUserTask.parent_user_task_id || childUserTask.parent_user_task_id !== mainUserTask.id) {
+                ctx.log?.error({ 
+                  childUserTaskId: childUserTask.id,
+                  expectedParentId: mainUserTask.id,
+                  actualParentId: childUserTask.parent_user_task_id
+                }, 'WARNING: Child user task parent_user_task_id mismatch!');
+              }
+              
               mainUserTask.childTasks.push(childUserTask);
               createdUserTasks.push(childUserTask);
             }

@@ -62,7 +62,7 @@ function InitTaskRouter(taskUsecase) {
       }
       return res.status(200).json(createResponse(task, "success", 200));
     } catch (error) {
-      req.log?.error(error, "TaskRouter.updateTask");
+      req.log?.error({ error: error.message, errorStack: error.stack, id: req.params.id, body: req.body }, "TaskRouter.updateTask");
       return res
         .status(500)
         .json(createResponse(null, "internal server error", 500));
