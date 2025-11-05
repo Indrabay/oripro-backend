@@ -178,7 +178,7 @@ class UserTaskRepository {
           {
             model: this.taskModel,
             as: 'task',
-            attributes: ['id', 'name', 'duration', 'is_scan', 'scan_code', 'is_main_task', 'task_group_id'],
+            // attributes: ['id', 'name', 'duration', 'is_scan', 'scan_code', 'is_main_task', 'task_group_id'],
             required: false // Don't require task - some user_tasks might not have matching tasks
           },
           {
