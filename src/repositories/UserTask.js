@@ -532,6 +532,7 @@ class UserTaskRepository {
       const updateData = {
         completed_at: now,
         updated_at: now,
+        status: 2, // completed
       };
       if (notes) {
         updateData.notes = notes;

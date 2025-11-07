@@ -1,3 +1,5 @@
+const sequelize = require("../models/sequelize");
+
 class UserTaskUsecase {
   constructor(userTaskRepository, taskRepository, taskScheduleRepository, userTaskEvidenceRepository) {
     this.userTaskRepository = userTaskRepository;
@@ -116,11 +118,33 @@ class UserTaskUsecase {
         throw new Error('Task has already been completed');
       }
 
-      const result = await this.userTaskRepository.completeTask(userTaskId, data.notes, ctx);
+      // Use transaction to ensure both task completion and evidence saving happen atomically
+      const result = await sequelize.transaction(async (t) => {
+        // Complete the task
+        const completedTask = await this.userTaskRepository.completeTask(userTaskId, data.notes, ctx, t);
+        
+        // Save evidence URLs if provided
+        if (data.evidence) {
+          // Handle both array and single URL string
+          const urlArray = Array.isArray(data.evidence) ? data.evidence : [data.evidence];
+          
+          for (const url of urlArray) {
+            if (url && typeof url === 'string') {
+              await this.userTaskEvidenceRepository.create({
+                user_task_id: userTaskId,
+                url: url,
+              }, ctx, t);
+            }
+          }
+        }
+        
+        return completedTask;
+      });
+      
       return result;
     } catch (error) {
       ctx.log?.error(
-        { userTaskId, data, error: error.message },
+        { userTaskId, data, error: error.message, errorStack: error.stack },
         "UserTaskUsecase.completeUserTask_error"
       );
       throw error;

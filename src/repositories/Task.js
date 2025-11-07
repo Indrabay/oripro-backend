@@ -48,6 +48,35 @@ class TaskRepository {
         ]
       });
       
+      if (!task) {
+        return null;
+      }
+      
+      // Get parent task IDs from junction table
+      let parentTaskIds = [];
+      if (this.taskParentModel) {
+        const parentRelations = await this.taskParentModel.findAll({
+          where: { child_task_id: id },
+          attributes: ['parent_task_id']
+        });
+        ctx.log?.info({ id, parentRelationsCount: parentRelations.length, parentRelations }, "TaskRepository.findById_parentRelations");
+        parentTaskIds = parentRelations.map(rel => {
+          const parentId = rel.get ? rel.get('parent_task_id') : rel.parent_task_id;
+          return parentId;
+        });
+        ctx.log?.info({ id, parentTaskIds }, "TaskRepository.findById_parentTaskIds");
+      }
+      
+      // Attach parent_task_ids to the Sequelize instance's dataValues
+      // so it will be included when toJSON() is called
+      if (task.dataValues) {
+        task.dataValues.parent_task_ids = parentTaskIds;
+      } else {
+        task.parent_task_ids = parentTaskIds;
+      }
+      
+      // Also set it directly on the instance for direct access
+      task.parent_task_ids = parentTaskIds;
       
       return task;
     } catch (error) {

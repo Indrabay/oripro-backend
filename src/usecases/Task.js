@@ -255,6 +255,12 @@ class TaskUsecase {
         return null;
       }
     
+      // Get parent_task_ids from task instance before converting to JSON
+      // (it might be set directly on the instance or in dataValues)
+      const parentTaskIds = task.parent_task_ids || 
+                           (task.dataValues && task.dataValues.parent_task_ids) || 
+                           [];
+      
       const taskJson = task.toJSON ? task.toJSON() : task;
       
       // Get schedules using taskScheduleRepository
@@ -265,7 +271,6 @@ class TaskUsecase {
       const role = taskJson.role;
       const asset = taskJson.asset;
       const taskGroup = taskJson.taskGroup;
-      const parentTaskIds = taskJson.parent_task_ids || [];
       
       // Remove association objects to avoid circular references
       delete taskJson.createdBy;

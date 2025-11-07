@@ -158,6 +158,25 @@ function InitUserTaskRouter(userTaskUsecase) {
   const completeUserTaskParam = [
     param("id").isInt().notEmpty(),
     body("notes").isString().optional(),
+    body("evidence").optional().custom((value) => {
+      // Allow single URL string or array of URL strings
+      if (Array.isArray(value)) {
+        // Validate each item in array is a string (URL)
+        for (const url of value) {
+          if (typeof url !== 'string' || !url.trim()) {
+            throw new Error('Each evidence must be a non-empty URL string');
+          }
+        }
+      } else if (typeof value === 'string') {
+        // Single URL string is valid
+        if (!value.trim()) {
+          throw new Error('Evidence URL must be a non-empty string');
+        }
+      } else if (value !== undefined && value !== null) {
+        throw new Error('Evidence must be a URL string or array of URL strings');
+      }
+      return true;
+    }),
   ];
 
   async function getUserTaskByCode(req, res) {

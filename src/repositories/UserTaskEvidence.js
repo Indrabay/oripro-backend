@@ -9,15 +9,7 @@ class UserTaskEvidenceRepository {
       ctx.log?.info(data, 'UserTaskEvidenceRepository.create');
       const evidence = await this.userTaskEvidenceModel.create({
         user_task_id: data.user_task_id,
-        evidence_type: data.evidence_type,
-        file_path: data.file_path,
-        file_name: data.file_name,
-        file_size: data.file_size,
-        mime_type: data.mime_type,
-        scan_code: data.scan_code,
-        latitude: data.latitude,
-        longitude: data.longitude,
-        description: data.description,
+        url: data.url,
       }, { transaction: tx });
       return evidence.toJSON();
     } catch (error) {
