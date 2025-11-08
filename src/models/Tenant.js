@@ -62,6 +62,18 @@ Tenant.init({
     type: DataTypes.INTEGER,
     allowNull: false,
   },
+  rent_price: {
+    type: DataTypes.FLOAT,
+    allowNull: true,
+  },
+  down_payment: {
+    type: DataTypes.FLOAT,
+    allowNull: true,
+  },
+  deposit: {
+    type: DataTypes.FLOAT,
+    allowNull: true,
+  },
   status: {
     type: DataTypes.INTEGER,
     defaultValue: 2, // pending

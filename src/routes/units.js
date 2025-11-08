@@ -15,9 +15,6 @@ function InitUnitRouter(UnitUsecase) {
       body('asset_id').isUUID().notEmpty(),
       body('description').optional().isString(),
       body('size').isFloat().notEmpty(),
-      body('lamp').optional().isNumeric(),
-      body('rent_price').notEmpty().isFloat(),
-      body('electric_socket').optional().isNumeric(),
       body('electrical_power').notEmpty().isNumeric(),
       body('electrical_unit').optional().isString(),
       body('is_toilet_exist').notEmpty().isBoolean(),
@@ -26,15 +23,12 @@ function InitUnitRouter(UnitUsecase) {
     async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-      const { name, asset_id, size, rent_price, lamp, electric_socket, electrical_power, electrical_unit, is_toilet_exist, description, photos } = req.body;
+      const { name, asset_id, size, electrical_power, electrical_unit, is_toilet_exist, description, photos } = req.body;
       req.log?.info({ name }, 'route_units_create');
       const unit = await UnitUsecase.createUnit({
         name,
         asset_id,
         description,
-        lamp,
-        rent_price,
-        electric_socket,
         electrical_power,
         electrical_unit,
         is_toilet_exist,
@@ -88,9 +82,6 @@ function InitUnitRouter(UnitUsecase) {
       param('id').isString().notEmpty(),
       body('name').optional().isString().notEmpty(),
       body('size').optional().isFloat().notEmpty(),
-      body('rent_price').optional().isFloat().notEmpty(),
-      body('lamp').optional().isNumeric(),
-      body('electric_socket').optional().isNumeric(),
       body('electrical_power').optional().isNumeric(),
       body('electrical_unit').optional().isString(),
       body('is_toilet_exist').optional().isBoolean(),
@@ -99,15 +90,12 @@ function InitUnitRouter(UnitUsecase) {
     async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json(createResponse(null, "bad request", 400, false, {}, errors));
-      const { name, size, rent_price, lamp, electric_socket, electrical_power, electrical_unit, is_toilet_exist, description } = req.body;
+      const { name, size, electrical_power, electrical_unit, is_toilet_exist, description } = req.body;
       req.log?.info({ id: req.params.id }, 'route_units_update');
       try {
         const unit = await UnitUsecase.updateUnit(req.params.id, {
           name,
           size,
-          rent_price,
-          lamp,
-          electric_socket,
           electrical_power,
           electrical_unit,
           is_toilet_exist,

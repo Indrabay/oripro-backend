@@ -20,6 +20,7 @@ const { InitRoleRouter } = require('./routes/roles');
 const { InitMenuRouter } = require('./routes/menus');
 const { InitScanInfoRouter } = require('./routes/scanInfos');
 const { InitTaskGroupRouter } = require('./routes/taskGroups');
+const { InitComplaintReportRouter } = require('./routes/complaintReports');
 const { requestContext } = require('./middleware/requestContext');
 const { metricsMiddleware, metricsHandler } = require('./services/metrics');
 
@@ -43,6 +44,8 @@ const UserAccessMenuRepository = require('./repositories/UserAccessMenu');
 const UserLogRepository = require('./repositories/UserLog');
 const UnitLogRepository = require('./repositories/UnitLog');
 const TenantLogRepository = require('./repositories/TenantLog');
+const DepositoLogRepository = require('./repositories/DepositoLog');
+const ComplaintReportRepository = require('./repositories/ComplaintReport');
 const AttendanceRepository = require('./repositories/Attendance');
 const UserAssetRepository = require('./repositories/UserAsset');
 const TaskRepository = require('./repositories/Task');
@@ -67,6 +70,7 @@ const taskUc = require('./usecases/Task');
 const taskGroupUc = require('./usecases/TaskGroup');
 const userTaskUc = require('./usecases/UserTask');
 const scanInfoUc = require('./usecases/ScanInfo');
+const complaintReportUc = require('./usecases/ComplaintReport');
 const attendanceUc = require('./usecases/Attendance');
 
 // define models database
@@ -89,6 +93,8 @@ const modelTenantCategory = require('./models/TenantCategory');
 const modelUserLog = require('./models/UserLog');
 const modelUnitLog = require('./models/UnitLog');
 const modelTenantLog = require('./models/TenantLog');
+const modelDepositoLog = require('./models/DepositoLog');
+const { ComplaintReport } = require('./models/ComplaintReport');
 const modelUserAsset = require('./models/UserAsset');
 const modelTask = require('./models/Task');
 const modelTaskSchedule = require('./models/TaskSchedule');
@@ -118,6 +124,8 @@ const userAccessMenuRepository = new UserAccessMenuRepository(User, modelRole, m
 const userLogRepository = new UserLogRepository(modelUserLog, User, modelRole)
 const unitLogRepository = new UnitLogRepository(modelUnitLog, User)
 const tenantLogRepository = new TenantLogRepository(modelTenantLog, User);
+const depositoLogRepository = new DepositoLogRepository(modelDepositoLog, User);
+const complaintReportRepository = new ComplaintReportRepository(ComplaintReport, User, Tenant);
 const userAssetRepository = new UserAssetRepository(modelUserAsset);
 const taskRepository = new TaskRepository(modelTask, User, modelRole, Asset, modelTaskGroup, modelTaskParent);
 const taskScheduleRepository = new TaskScheduleRepository(modelTaskSchedule);
@@ -149,6 +157,8 @@ const models = {
   UserLog: modelUserLog,
   UnitLog: modelUnitLog,
   TenantLog: modelTenantLog,
+  DepositoLog: modelDepositoLog,
+  ComplaintReport: ComplaintReport,
   UserAsset: modelUserAsset,
   Task: modelTask,
   TaskSchedule: modelTaskSchedule,
@@ -184,7 +194,7 @@ const authUsecase = new authUc(
 );
 const userUsecase = new userUc(userRepository, userLogRepository, userAssetRepository);
 const unitUsecase = new unitUc(unitRepository, unitAttachmentRepository, unitLogRepository);
-const tenantUsecase = new tenantUc(tenantRepository, tenantAttachmentRepository, tenantUnitRepository, mapTenantCategoryRepository, tenantCategoryRepository, unitRepository, tenantLogRepository, userUsecase);
+const tenantUsecase = new tenantUc(tenantRepository, tenantAttachmentRepository, tenantUnitRepository, mapTenantCategoryRepository, tenantCategoryRepository, unitRepository, tenantLogRepository, depositoLogRepository, userUsecase);
 const roleUsecase = new roleUc(roleRepository);
 const menuUsecase = new menuUc(menuRepository);
 const userAccessMenuUsecase = new userAccessMenuUc(userAccessMenuRepository);
@@ -192,6 +202,7 @@ const taskUsecase = new taskUc(taskRepository, taskScheduleRepository, taskLogRe
 const taskGroupUsecase = new taskGroupUc(taskGroupRepository);
 const userTaskUsecase = new userTaskUc(userTaskRepository, taskRepository, taskScheduleRepository, userTaskEvidenceRepository);
 const scanInfoUsecase = new scanInfoUc(scanInfoRepository);
+const complaintReportUsecase = new complaintReportUc(complaintReportRepository, userRepository, tenantRepository);
 const attendanceRepository = new AttendanceRepository();
 const attendanceUsecase = new attendanceUc(attendanceRepository);
 
@@ -208,6 +219,7 @@ const uploadFileRouter = uploadsRouter.InitUploadRouter();
 const taskRouter = taskRoute.InitTaskRouter(taskUsecase);
 const taskGroupRouter = InitTaskGroupRouter(taskGroupUsecase);
 const scanInfoRouter = InitScanInfoRouter(scanInfoUsecase);
+const complaintReportRouter = InitComplaintReportRouter(complaintReportUsecase);
 const userTaskRouter = require('./routes/userTasks').InitUserTaskRouter(userTaskUsecase);
 
 // Middleware
@@ -355,6 +367,7 @@ app.use('/api/menus', menuRouter);
 app.use('/api/uploads', uploadFileRouter);
 app.use('/api/scan-infos', scanInfoRouter);
 app.use('/api/user-tasks', userTaskRouter);
+app.use('/api/complaint-reports', complaintReportRouter);
 
 app.use('/api/attendances', attendanceRouter);
 app.get('/metrics', metricsHandler);

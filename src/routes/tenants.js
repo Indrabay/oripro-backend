@@ -18,6 +18,9 @@ function InitTenantRouter(TenantUseCase) {
       body('contract_begin_at').notEmpty(),
       body('rent_duration').isNumeric(),
       body('rent_duration_unit').notEmpty().isString(),
+      body('rent_price').optional().isFloat(),
+      body('down_payment').optional().isFloat(),
+      body('deposit').optional().isFloat(),
       // user_id boleh kosong jika new_user disediakan
       body('user_id').optional().isString(),
       body('new_user').optional().isObject(),
@@ -48,6 +51,9 @@ function InitTenantRouter(TenantUseCase) {
         contract_begin_at,
         rent_duration,
         rent_duration_unit,
+        rent_price,
+        down_payment,
+        deposit,
         categories,
         user_id,
         new_user,
@@ -57,7 +63,7 @@ function InitTenantRouter(TenantUseCase) {
       console.log("TenantRouter.createTenant - extracted new_user:", new_user);
 
       const tenant = await TenantUseCase.createTenant({
-        name, tenant_identifications, contract_documents, contract_begin_at, unit_ids, rent_duration, rent_duration_unit, user_id, new_user, categories,createdBy: req.auth.userId
+        name, tenant_identifications, contract_documents, contract_begin_at, unit_ids, rent_duration, rent_duration_unit, rent_price, down_payment, deposit, user_id, new_user, categories,createdBy: req.auth.userId
       }, {userId: req.auth.userId, log: req.log});
       res.status(201).json(createResponse(tenant, "success", 201));
     } catch (err) {
@@ -152,7 +158,33 @@ function InitTenantRouter(TenantUseCase) {
       req.log?.error({ tenant_id: req.params.id }, `TenantRouter.getTenantLogs_error: ${err.message}`);
       res.status(500).json(createResponse(null, "internal server error", 500))
     }
-  })
+  });
+
+  router.get('/:id/deposito-logs', [
+    param('id').isUUID().withMessage('ID must be a valid UUID')
+  ], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json(createResponse(null, "bad request", 400, false, {}, errors));
+    }
+    
+    try {
+      req.log?.info({ tenant_id: req.params.id }, "TenantRouter.getDepositoLogs");
+      const depositoLogs = await TenantUseCase.getDepositoLogs(req.params.id, {
+        userId: req.auth.userId,
+        log: req.log
+      });
+
+      res.status(200).json(createResponse(depositoLogs, "success", 200, true, {
+        total: depositoLogs.length,
+        limit: depositoLogs.length,
+        offset: 0
+      }));
+    } catch (err) {
+      req.log?.error({ tenant_id: req.params.id }, `TenantRouter.getDepositoLogs_error: ${err.message}`);
+      res.status(500).json(createResponse(null, "internal server error", 500));
+    }
+  });
 
   return router;
 }

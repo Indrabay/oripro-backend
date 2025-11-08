@@ -64,6 +64,10 @@ class TenantRepository {
           };
         }
 
+        if (filter.user_id) {
+          whereQuery.where.user_id = filter.user_id;
+        }
+
         if (filter.status) {
           whereQuery.where.status = filter.status;
         }

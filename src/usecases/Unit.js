@@ -35,7 +35,6 @@ class UnitUsecase {
         new_data: {
           name: unit.name,
           size: unit.size,
-          rent_price: unit.rent_price,
         },
         created_by: ctx.userId,
       };
@@ -82,9 +81,6 @@ class UnitUsecase {
       asset_id: data.asset_id ?? unit.asset?.id,
       name: data.name ?? unit.name,
       size: data.size ?? unit.size,
-      rent_price: data.rent_price ?? unit.rent_price,
-      lamp: data.lamp ?? unit.lamp,
-      electric_socket: data.electric_socket ?? unit.electric_socket,
       electrical_power: data.electrical_power ?? unit.electrical_power,
       electrical_unit: data.electrical_unit ?? unit.electrical_unit,
       is_toilet_exist: data.is_toilet_exist ?? unit.is_toilet_exist,
@@ -106,9 +102,6 @@ class UnitUsecase {
         current_unit: {
           name: unit.name,
           size: unit.size,
-          rent_price: unit.rent_price,
-          lamp: unit.lamp,
-          electric_socket: unit.electric_socket,
           electrical_power: unit.electrical_power,
           electrical_unit: unit.electrical_unit,
           is_toilet_exist: unit.is_toilet_exist,
@@ -125,21 +118,9 @@ class UnitUsecase {
         oldData.size = unit.size;
         newData.size = data.size;
       }
-      if (data.rent_price !== undefined && data.rent_price !== unit.rent_price) {
-        oldData.rent_price = unit.rent_price;
-        newData.rent_price = data.rent_price;
-      }
       if (data.description !== undefined && data.description !== unit.description) {
         oldData.description = unit.description;
         newData.description = data.description;
-      }
-      if (data.lamp !== undefined && data.lamp !== unit.lamp) {
-        oldData.lamp = unit.lamp;
-        newData.lamp = data.lamp;
-      }
-      if (data.electric_socket !== undefined && data.electric_socket !== unit.electric_socket) {
-        oldData.electric_socket = unit.electric_socket;
-        newData.electric_socket = data.electric_socket;
       }
       if (data.electrical_power !== undefined && data.electrical_power !== unit.electrical_power) {
         oldData.electrical_power = unit.electrical_power;
@@ -197,7 +178,6 @@ class UnitUsecase {
       old_data: {
         name: unit.name,
         size: unit.size,
-        rent_price: unit.rent_price,
       },
       new_data: null,
       created_by: ctx.userId,

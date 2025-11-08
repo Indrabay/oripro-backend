@@ -22,18 +22,6 @@ Unit.init(
       type: DataTypes.FLOAT,
       allowNull: false,
     },
-    rent_price: {
-      type: DataTypes.FLOAT,
-      allowNull: false,
-    },
-    lamp: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0,
-    },
-    electric_socket: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0,
-    },
     electrical_power: DataTypes.INTEGER,
     electrical_unit: {
       type: DataTypes.STRING,

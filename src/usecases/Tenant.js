@@ -18,6 +18,7 @@ class TenantUseCase {
     tenantCategoryRepo,
     unitRepository,
     tenantLogRepository,
+    depositoLogRepository,
     userUsecase
   ) {
     this.tenantRepository = tenantRepository;
@@ -27,15 +28,13 @@ class TenantUseCase {
     this.tenantCategoryRepo = tenantCategoryRepo;
     this.unitRepository = unitRepository;
     this.tenantLogRepository = tenantLogRepository;
+    this.depositoLogRepository = depositoLogRepository;
     this.userUsecase = userUsecase;
   }
 
   async createTenant(data, ctx) {
     try {
       ctx.log?.info(data, "TenantUsecase.createTenant");
-      console.log("TenantUsecase.createTenant - received data:", JSON.stringify(data, null, 2));
-      console.log("TenantUsecase.createTenant - user_id:", data.user_id);
-      console.log("TenantUsecase.createTenant - new_user:", data.new_user);
       const result = await sequelize.transaction(async (t) => {
         // Jika user_id tidak ada dan ada data new_user, buat user terlebih dahulu
         if ((!data.user_id || data.user_id === '') && data.new_user && this.userUsecase) {
@@ -85,6 +84,9 @@ class TenantUseCase {
           created_by: data.createdBy,
           rent_duration: data.rent_duration,
           rent_duration_unit: DurationUnit[data.rent_duration_unit],
+          rent_price: data.rent_price || null,
+          down_payment: data.down_payment || null,
+          deposit: data.deposit || null,
           status: 2, // pending
         };
         const tenant = await this.tenantRepository.create(
@@ -128,11 +130,27 @@ class TenantUseCase {
             status: TenantStatusIntToStr[tenant.status], // Convert to string for log
             rent_duration: tenant.rent_duration,
             rent_duration_unit: DurationUnitStr[tenant.rent_duration_unit], // Convert back to string for log
+            rent_price: tenant.rent_price,
+            down_payment: tenant.down_payment,
+            deposit: tenant.deposit,
           },
           created_by: ctx.userId,
         };
 
         await this.tenantLogRepository.create(tenantLog, ctx);
+        
+        // Create deposito log if deposit is provided
+        if (tenant.deposit !== null && tenant.deposit !== undefined) {
+          const depositoLog = {
+            tenant_id: tenant.id,
+            old_deposit: null,
+            new_deposit: tenant.deposit,
+            reason: 'initial value',
+            created_by: ctx.userId,
+          };
+          await this.depositoLogRepository.create(depositoLog, { ...ctx, transaction: t }, t);
+        }
+        
         return this.tenantToJson(tenant);
       });
 
@@ -384,6 +402,18 @@ class TenantUseCase {
         await this.tenantLogRepository.create(tenantLog, ctx);
       }
       
+      // Create deposito log if deposit changed
+      if (data.deposit !== undefined && data.deposit !== oldTenant.deposit) {
+        const depositoLog = {
+          tenant_id: id,
+          old_deposit: oldTenant.deposit,
+          new_deposit: data.deposit,
+          reason: data.deposit_reason || null,
+          created_by: ctx.userId,
+        };
+        await this.depositoLogRepository.create(depositoLog, ctx);
+      }
+      
       return updatedTenant;
     } catch (error) {
       ctx.log?.error({ tenant_id: id, update_data: data }, `TenantUsecase.updateTenant_error: ${error.message}`);
@@ -443,6 +473,17 @@ class TenantUseCase {
     ctx.log?.info({ tenant_id: id }, "TenantUsecase.getTenantLogs");
     let tenantLogs = await this.tenantLogRepository.findByTenantID(id, ctx);
     return tenantLogs;
+  }
+
+  async getDepositoLogs(id, ctx) {
+    try {
+      ctx.log?.info({ tenant_id: id }, "TenantUsecase.getDepositoLogs");
+      const depositoLogs = await this.depositoLogRepository.findByTenantId(id, ctx);
+      return depositoLogs;
+    } catch (error) {
+      ctx.log?.error({ tenant_id: id, error: error.message }, "TenantUsecase.getDepositoLogs_error");
+      throw error;
+    }
   }
 
   async tenantToJson(tenant) {
