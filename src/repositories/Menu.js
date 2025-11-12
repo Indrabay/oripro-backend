@@ -31,6 +31,14 @@ class MenuRepository {
     return menu ? menu.toJSON() : null;
   }
 
+  async findByUrl(url, ctx = {}) {
+    ctx.log?.debug({ url }, 'repo_find_menu_by_url');
+    const menu = await this.menuModel.findOne({
+      where: { url },
+    });
+    return menu ? menu.toJSON() : null;
+  }
+
   async create(menuData, ctx = {}) {
     ctx.log?.info({ title: menuData.title }, 'repo_create_menu');
     const menu = await this.menuModel.create({

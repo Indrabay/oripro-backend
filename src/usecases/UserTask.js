@@ -104,40 +104,49 @@ class UserTaskUsecase {
     try {
       ctx.log?.info({ userTaskId, data }, "UserTaskUsecase.completeUserTask");
       
-      // Check if user task exists and belongs to the user
-      const userTask = await this.userTaskRepository.findById(userTaskId, ctx);
-      if (!userTask || userTask.user_id !== ctx.userId) {
-        return null;
-      }
+      // Use transaction to ensure atomicity
+      const result = await sequelize.transaction(async (tx) => {
+        // Check if user task exists and belongs to the user
+        const userTask = await this.userTaskRepository.findById(userTaskId, ctx);
+        if (!userTask || userTask.user_id !== ctx.userId) {
+          return null;
+        }
 
-      if (userTask.start_at === null) {
-        throw new Error('Task must be started before it can be completed');
-      }
+        if (userTask.start_at === null) {
+          throw new Error('Task must be started before it can be completed');
+        }
 
-      if (userTask.completed_at !== null) {
-        throw new Error('Task has already been completed');
-      }
+        if (userTask.completed_at !== null) {
+          throw new Error('Task has already been completed');
+        }
 
-      // Use transaction to ensure both task completion and evidence saving happen atomically
-      const result = await sequelize.transaction(async (t) => {
-        // Complete the task
-        const completedTask = await this.userTaskRepository.completeTask(userTaskId, data.notes, ctx, t);
+        // Get task details to check if validation or scan is needed
+        const task = await this.taskRepository.findById(userTask.task_id, ctx);
         
-        // Save evidence URLs if provided
-        if (data.evidence) {
-          // Handle both array and single URL string
-          const urlArray = Array.isArray(data.evidence) ? data.evidence : [data.evidence];
-          
-          for (const url of urlArray) {
-            if (url && typeof url === 'string') {
+        // Complete the task
+        const completedTask = await this.userTaskRepository.completeTask(userTaskId, data.notes, ctx, tx);
+
+        // Handle evidence files - save all evidences provided
+        const evidencesToSave = [];
+        
+        // Add file evidences if provided
+        if (data.evidences && data.evidences.length > 0) {
+          evidencesToSave.push(...data.evidences);
+        }
+
+        // Save all evidences
+        if (evidencesToSave.length > 0) {
+          for (const evidence of evidencesToSave) {
+            // Use url field from evidence data
+            if (evidence.url) {
               await this.userTaskEvidenceRepository.create({
                 user_task_id: userTaskId,
-                url: url,
-              }, ctx, t);
+                url: evidence.url,
+              }, ctx, tx);
             }
           }
         }
-        
+
         return completedTask;
       });
       

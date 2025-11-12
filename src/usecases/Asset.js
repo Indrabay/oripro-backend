@@ -99,44 +99,25 @@ class AssetUsecase {
   }
 
   async listAssets(queryParams, ctx) {
-    if (ctx.roleName === "super_admin") {
-      const data = await this.assetRepository.listAll(queryParams, ctx);
-      data.assets.map(a => {
-        a.asset_type = AssetTypeIntToStr[a.asset_type];
-        a.status = AssetStatusIntToStr[a.status];
-        return a
-      })
-      
-      // Get unit counts per asset
-      const assetIds = data.assets.map(a => a.id);
-      const unitCountMap = await this.unitRepository.countByAssetIds(assetIds, ctx);
-      
-      // Add total_units to each asset
-      data.assets.forEach(asset => {
-        asset.total_units = unitCountMap[asset.id] || 0;
-      });
-      
-      return data
-
-    }
-    const assets = await this.assetRepository.listForAdmin(ctx.userId, queryParams, ctx);
-    
-    // Transform asset_type and status to strings
-    assets.forEach(a => {
+    const data = await this.assetRepository.listAll(queryParams, ctx);
+    data.assets.map(a => {
       a.asset_type = AssetTypeIntToStr[a.asset_type];
       a.status = AssetStatusIntToStr[a.status];
-    });
+      return a
+    })
     
-    // Get unit counts per asset for admin users
-    const assetIds = assets.map(a => a.id);
+    // Get unit counts per asset
+    const assetIds = data.assets.map(a => a.id);
     const unitCountMap = await this.unitRepository.countByAssetIds(assetIds, ctx);
     
     // Add total_units to each asset
-    assets.forEach(asset => {
+    data.assets.forEach(asset => {
       asset.total_units = unitCountMap[asset.id] || 0;
     });
     
-    return assets;
+    return data
+
+    
   }
 
   async getAsset(id, ctx) {

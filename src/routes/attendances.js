@@ -24,7 +24,14 @@ function InitAttendanceRouter(attendanceUsecase) {
       }
 
       const { asset_id, latitude, longitude, notes } = req.body;
-      const user_id = req.user.id;
+      const user_id = req.auth?.userId;
+
+      if (!user_id) {
+        return res.status(401).json({
+          success: false,
+          message: 'Unauthorized: User ID not found'
+        });
+      }
 
       req.log?.info({ user_id, asset_id, latitude, longitude, notes }, 'route_check_in');
       const result = await attendanceUsecase.checkIn(user_id, asset_id, latitude, longitude, notes);
@@ -62,7 +69,14 @@ function InitAttendanceRouter(attendanceUsecase) {
       }
 
       const { asset_id, latitude, longitude, notes } = req.body;
-      const user_id = req.user.id;
+      const user_id = req.auth?.userId;
+
+      if (!user_id) {
+        return res.status(401).json({
+          success: false,
+          message: 'Unauthorized: User ID not found'
+        });
+      }
 
       req.log?.info({ user_id, asset_id, latitude, longitude, notes }, 'route_check_out');
       const result = await attendanceUsecase.checkOut(user_id, asset_id, latitude, longitude, notes);
@@ -86,7 +100,14 @@ function InitAttendanceRouter(attendanceUsecase) {
   router.get('/today-status/:assetId', async (req, res) => {
     try {
       const { assetId } = req.params;
-      const user_id = req.user.id;
+      const user_id = req.auth?.userId;
+
+      if (!user_id) {
+        return res.status(401).json({
+          success: false,
+          message: 'Unauthorized: User ID not found'
+        });
+      }
 
       req.log?.info({ user_id, assetId }, 'route_get_today_status');
       const result = await attendanceUsecase.getTodayStatus(user_id, assetId);
@@ -109,7 +130,15 @@ function InitAttendanceRouter(attendanceUsecase) {
   // Get user attendance history
   router.get('/history', async (req, res) => {
     try {
-      const user_id = req.user.id;
+      const user_id = req.auth?.userId;
+
+      if (!user_id) {
+        return res.status(401).json({
+          success: false,
+          message: 'Unauthorized: User ID not found'
+        });
+      }
+
       const limit = parseInt(req.query.limit) || 10;
 
       req.log?.info({ user_id, limit }, 'route_get_user_history');

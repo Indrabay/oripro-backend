@@ -174,6 +174,41 @@ function InitTaskGroupRouter(taskGroupUsecase) {
     }
   );
 
+  // GET /api/task-groups/work/list - Get task groups with tasks and user tasks for work page
+  router.get(
+    '/work/list',
+    async (req, res) => {
+      req.log?.info({ userId: req.auth?.userId }, 'route_task_groups_work_list');
+      try {
+        if (!req.auth?.userId) {
+          return res.status(401).json({
+            message: 'Unauthorized',
+            error: 'User ID not found in authentication'
+          });
+        }
+        
+        const taskGroups = await taskGroupUsecase.getTaskGroupsWithUserTasks(req.auth?.userId, {
+          requestId: req.requestId,
+          log: req.log,
+          userId: req.auth?.userId,
+        });
+        
+        req.log?.info({ 
+          userId: req.auth?.userId,
+          taskGroupsCount: taskGroups.length 
+        }, 'route_task_groups_work_list_success');
+        
+        return res.json(taskGroups);
+      } catch (error) {
+        req.log?.error({ error: error.message, stack: error.stack }, 'route_task_groups_work_list_error');
+        return res.status(500).json({
+          message: 'Internal Server Error',
+          error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+      }
+    }
+  );
+
   return router;
 }
 
