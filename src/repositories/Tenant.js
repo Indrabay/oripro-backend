@@ -1,9 +1,10 @@
 const { Op } = require("sequelize");
 
 class TenantRepository {
-  constructor(tenantModel, userModel) {
+  constructor(tenantModel, userModel, tenantCategoryModel) {
     this.tenantModel = tenantModel;
     this.userModel = userModel;
+    this.tenantCategoryModel = tenantCategoryModel;
   }
   async create(data, tx = null, ctx) {
     try {
@@ -34,6 +35,12 @@ class TenantRepository {
           model: this.userModel,
           as: "updatedBy",
           attributes: ["id", "name", "email"],
+        },
+        {
+          model: this.tenantCategoryModel,
+          as: "category",
+          attributes: ["id", "name"],
+          required: false,
         },
       ],
     });
@@ -88,6 +95,12 @@ class TenantRepository {
           model: this.userModel,
           as: 'user',
           attributes: ['id', 'name', 'email']
+        },
+        {
+          model: this.tenantCategoryModel,
+          as: 'category',
+          attributes: ['id', 'name'],
+          required: false,
         },
       ]
       const data = await this.tenantModel.findAndCountAll(whereQuery);
