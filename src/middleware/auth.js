@@ -17,21 +17,21 @@ function ensureRole(req, res, next) {
   // Check if this is a userTask route
   const isUserTaskRoute = req.baseUrl?.includes('/user-tasks') || req.path?.includes('/user-tasks') || req.originalUrl?.includes('/api/user-tasks');
   
-  if (isUserTaskRoute) {
-    // For userTask routes, only allow role_id > 2
-    const roleId = req.auth?.roleId;
-    const roleIdNum = typeof roleId === 'string' ? parseInt(roleId, 10) : roleId;
-    if (!roleId || roleIdNum <= 2 || isNaN(roleIdNum)) {
-      return res.status(403).json({ message: 'Forbidden: Insufficient role access' });
-    }
-    return next();
-  }
+  // if (isUserTaskRoute) {
+  //   // For userTask routes, only allow role_id > 2
+  //   const roleId = req.auth?.roleId;
+  //   const roleIdNum = typeof roleId === 'string' ? parseInt(roleId, 10) : roleId;
+  //   if (!roleId || roleIdNum <= 2 || isNaN(roleIdNum)) {
+  //     return res.status(403).json({ message: 'Forbidden: Insufficient role access' });
+  //   }
+  //   return next();
+  // }
   
   // For most routes, only super_admin and admin can access
   const roleName = req.auth?.roleName;
-  if (roleName !== 'super_admin' && roleName !== 'admin') {
-    return res.status(403).json({ message: 'Forbidden: Admin or Super Admin access required' });
-  }
+  // if (roleName !== 'super_admin' && roleName !== 'admin') {
+  //   return res.status(403).json({ message: 'Forbidden: Admin or Super Admin access required' });
+  // }
   
   return next();
 }

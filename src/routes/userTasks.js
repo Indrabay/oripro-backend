@@ -2,6 +2,7 @@ const { Router } = require("express");
 const { body, validationResult, param, query } = require("express-validator");
 const { authMiddleware, ensureRole } = require("../middleware/auth");
 const { createResponse } = require("../services/response");
+const uploadUserTaskEvidenceMiddleware = require("../middleware/uploadUserTaskEvidence");
 
 function InitUserTaskRouter(userTaskUsecase) {
   const router = Router();
@@ -23,7 +24,7 @@ function InitUserTaskRouter(userTaskUsecase) {
       
       return res.status(201).json(createResponse(result, "User tasks generated successfully", 201));
     } catch (error) {
-      req.log?.error(error, "UserTaskRouter.generateUpcomingUserTasks");
+      req.log?.error({ error: error.message, stack: error.stack }, "UserTaskRouter.generateUpcomingUserTasks");
       
       // Handle conflict error (already generated)
       if (error.statusCode === 409 || error.message.includes('already been generated')) {
@@ -34,7 +35,7 @@ function InitUserTaskRouter(userTaskUsecase) {
       
       return res
         .status(500)
-        .json(createResponse(null, "internal server error", 500));
+        .json(createResponse(null, error.message || "internal server error", 500));
     }
   }
 
@@ -55,10 +56,10 @@ function InitUserTaskRouter(userTaskUsecase) {
       
       return res.status(200).json(createResponse(result, "success", 200));
     } catch (error) {
-      req.log?.error(error, "UserTaskRouter.getUserTasks");
+      req.log?.error({ error: error.message, stack: error.stack }, "UserTaskRouter.getUserTasks");
       return res
         .status(500)
-        .json(createResponse(null, "internal server error", 500));
+        .json(createResponse(null, error.message || "internal server error", 500));
     }
   }
 
@@ -79,10 +80,10 @@ function InitUserTaskRouter(userTaskUsecase) {
       
       return res.status(200).json(createResponse(result, "success", 200));
     } catch (error) {
-      req.log?.error(error, "UserTaskRouter.getUpcomingUserTasks");
+      req.log?.error({ error: error.message, stack: error.stack }, "UserTaskRouter.getUpcomingUserTasks");
       return res
         .status(500)
-        .json(createResponse(null, "internal server error", 500));
+        .json(createResponse(null, error.message || "internal server error", 500));
     }
   }
 
@@ -109,16 +110,16 @@ function InitUserTaskRouter(userTaskUsecase) {
       
       return res.status(200).json(createResponse(result, "Task started successfully", 200));
     } catch (error) {
-      req.log?.error(error, "UserTaskRouter.startUserTask");
+      req.log?.error({ error: error.message, stack: error.stack }, "UserTaskRouter.startUserTask");
       return res
         .status(500)
-        .json(createResponse(null, "internal server error", 500));
+        .json(createResponse(null, error.message || "internal server error", 500));
     }
   }
 
   async function completeUserTask(req, res) {
     try {
-      req.log?.info({ id: req.params.id }, "UserTaskRouter.completeUserTask");
+      req.log?.info({ id: req.params.id, files: req.files }, "UserTaskRouter.completeUserTask");
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res
@@ -126,7 +127,50 @@ function InitUserTaskRouter(userTaskUsecase) {
           .json(createResponse(null, "validation error", 400, errors.array()));
       }
       
-      const result = await userTaskUsecase.completeUserTask(req.params.id, req.body, {
+      // Process files and create evidence data
+      const evidences = [];
+      const host = req.protocol + '://' + req.get('host');
+      
+      if (req.files) {
+        // Handle file_before (for validation)
+        if (req.files.file_before && req.files.file_before[0]) {
+          const file = req.files.file_before[0];
+          evidences.push({
+            url: `${host}/uploads/user-task-evidence/${file.filename}`,
+          });
+        }
+        
+        // Handle file_after (for validation)
+        if (req.files.file_after && req.files.file_after[0]) {
+          const file = req.files.file_after[0];
+          evidences.push({
+            url: `${host}/uploads/user-task-evidence/${file.filename}`,
+          });
+        }
+        
+        // Handle file_scan (for scan barcode)
+        if (req.files.file_scan && req.files.file_scan[0]) {
+          const file = req.files.file_scan[0];
+          evidences.push({
+            url: `${host}/uploads/user-task-evidence/${file.filename}`,
+          });
+        }
+      }
+      
+      // Always add remark as text evidence if provided, even if there are files
+      if (req.body.remark && req.body.remark.trim()) {
+        evidences.push({
+          url: `text:${req.body.remark}`,
+        });
+      }
+      
+      // Prepare complete data object
+      const completeData = {
+        notes: req.body.notes || req.body.remark || null,
+        evidences: evidences
+      };
+      
+      const result = await userTaskUsecase.completeUserTask(req.params.id, completeData, {
         userId: req.auth?.userId,
         log: req.log,
       });
@@ -139,10 +183,11 @@ function InitUserTaskRouter(userTaskUsecase) {
       
       return res.status(200).json(createResponse(result, "Task completed successfully", 200));
     } catch (error) {
-      req.log?.error(error, "UserTaskRouter.completeUserTask");
+      console.log(error);
+      req.log?.error({ error: error.message, stack: error.stack }, "UserTaskRouter.completeUserTask");
       return res
         .status(500)
-        .json(createResponse(null, "internal server error", 500));
+        .json(createResponse(null, error.message || "internal server error", 500));
     }
   }
 
@@ -202,10 +247,10 @@ function InitUserTaskRouter(userTaskUsecase) {
       
       return res.status(200).json(createResponse(result, "success", 200));
     } catch (error) {
-      req.log?.error(error, "UserTaskRouter.getUserTaskByCode");
+      req.log?.error({ error: error.message, stack: error.stack }, "UserTaskRouter.getUserTaskByCode");
       return res
         .status(500)
-        .json(createResponse(null, "internal server error", 500));
+        .json(createResponse(null, error.message || "internal server error", 500));
     }
   }
 
@@ -228,7 +273,7 @@ function InitUserTaskRouter(userTaskUsecase) {
   router.get("/", getUserTasksParam, getUserTasks);
   router.get("/upcoming", getUpcomingUserTasks);
   router.put("/:id/start", startUserTaskParam, startUserTask);
-  router.put("/:id/complete", completeUserTaskParam, completeUserTask);
+  router.put("/:id/complete", uploadUserTaskEvidenceMiddleware(), completeUserTaskParam, completeUserTask);
 
   return router;
 }

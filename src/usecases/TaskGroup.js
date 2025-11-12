@@ -60,6 +60,17 @@ class TaskGroupUseCase {
       throw error;
     }
   }
+
+  async getTaskGroupsWithUserTasks(userId, ctx = {}) {
+    ctx.log?.info({ userId }, 'usecase_get_task_groups_with_user_tasks');
+    try {
+      const taskGroups = await this.taskGroupRepository.findWithTasksAndUserTasks(userId, ctx);
+      return taskGroups;
+    } catch (error) {
+      ctx.log?.error({ error: error.message }, 'usecase_get_task_groups_with_user_tasks_error');
+      throw error;
+    }
+  }
 }
 
 module.exports = TaskGroupUseCase;

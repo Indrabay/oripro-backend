@@ -21,6 +21,7 @@ const { InitMenuRouter } = require('./routes/menus');
 const { InitScanInfoRouter } = require('./routes/scanInfos');
 const { InitTaskGroupRouter } = require('./routes/taskGroups');
 const { InitComplaintReportRouter } = require('./routes/complaintReports');
+const { InitTicketRouter } = require('./routes/tickets');
 const { requestContext } = require('./middleware/requestContext');
 const { metricsMiddleware, metricsHandler } = require('./services/metrics');
 
@@ -56,6 +57,7 @@ const TaskParentRepository = require('./repositories/TaskParent');
 const ScanInfoRepository = require('./repositories/ScanInfo');
 const UserTaskRepository = require('./repositories/UserTask');
 const UserTaskEvidenceRepository = require('./repositories/UserTaskEvidence');
+const TicketRepository = require('./repositories/Ticket');
 
 // define usecase module
 const authUc = require('./usecases/Auth');
@@ -72,6 +74,7 @@ const userTaskUc = require('./usecases/UserTask');
 const scanInfoUc = require('./usecases/ScanInfo');
 const complaintReportUc = require('./usecases/ComplaintReport');
 const attendanceUc = require('./usecases/Attendance');
+const ticketUc = require('./usecases/Ticket');
 
 // define models database
 const {User} = require('./models/User');
@@ -104,6 +107,7 @@ const modelTaskGroup = require('./models/TaskGroup');
 const modelTaskParent = require('./models/TaskParent');
 const modelUserTask = require('./models/UserTask');
 const modelUserTaskEvidence = require('./models/UserTaskEvidence');
+const modelTicket = require('./models/Ticket');
 
 // initialize repository
 const userRepository = new UserRepository(User, modelRole);
@@ -130,11 +134,12 @@ const userAssetRepository = new UserAssetRepository(modelUserAsset);
 const taskRepository = new TaskRepository(modelTask, User, modelRole, Asset, modelTaskGroup, modelTaskParent);
 const taskScheduleRepository = new TaskScheduleRepository(modelTaskSchedule);
 const taskLogRepository = new TaskLogRepository(modelTaskLog, User);
-const taskGroupRepository = new TaskGroupRepository(modelTaskGroup);
+const taskGroupRepository = new TaskGroupRepository(modelTaskGroup, modelTask, modelUserTask, modelTaskParent, User);
 const taskParentRepository = new TaskParentRepository(modelTaskParent);
 const scanInfoRepository = new ScanInfoRepository(modelScanInfo, User, Asset);
 const userTaskRepository = new UserTaskRepository(modelUserTask, User, modelTask, modelUserTaskEvidence, modelTaskSchedule, modelTaskGroup, modelTaskParent);
 const userTaskEvidenceRepository = new UserTaskEvidenceRepository(modelUserTaskEvidence, modelUserTask);
+const ticketRepository = new TicketRepository(modelTicket, User);
 
 // Setup model associations
 const models = {
@@ -168,6 +173,7 @@ const models = {
   TaskParent: modelTaskParent,
   UserTask: modelUserTask,
   UserTaskEvidence: modelUserTaskEvidence,
+  Ticket: modelTicket,
 };
 
 // Setup associations
@@ -205,6 +211,7 @@ const scanInfoUsecase = new scanInfoUc(scanInfoRepository);
 const complaintReportUsecase = new complaintReportUc(complaintReportRepository, userRepository, tenantRepository);
 const attendanceRepository = new AttendanceRepository();
 const attendanceUsecase = new attendanceUc(attendanceRepository);
+const ticketUsecase = new ticketUc(ticketRepository, userAccessMenuRepository, menuRepository);
 
 // initalize router
 const authRouter = auth.InitAuthRouter(authUsecase);
@@ -221,6 +228,7 @@ const taskGroupRouter = InitTaskGroupRouter(taskGroupUsecase);
 const scanInfoRouter = InitScanInfoRouter(scanInfoUsecase);
 const complaintReportRouter = InitComplaintReportRouter(complaintReportUsecase);
 const userTaskRouter = require('./routes/userTasks').InitUserTaskRouter(userTaskUsecase);
+const ticketRouter = InitTicketRouter(ticketUsecase);
 
 // Middleware
 app.use(helmet());
@@ -368,6 +376,7 @@ app.use('/api/uploads', uploadFileRouter);
 app.use('/api/scan-infos', scanInfoRouter);
 app.use('/api/user-tasks', userTaskRouter);
 app.use('/api/complaint-reports', complaintReportRouter);
+app.use('/api/tickets', ticketRouter);
 
 app.use('/api/attendances', attendanceRouter);
 app.get('/metrics', metricsHandler);

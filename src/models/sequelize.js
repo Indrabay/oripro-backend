@@ -29,50 +29,75 @@ if (DB_TYPE === 'mysql') {
     }
   );
 } else {
-  // PostgreSQL - Use connection string only
+  // PostgreSQL - Use connection string or config.json
   const DATABASE_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.PGURI;
-
-  if (!DATABASE_URL) {
-    console.error('[Sequelize] ERROR: DATABASE_URL is required for PostgreSQL!');
-    console.error('[Sequelize] Please set DATABASE_URL, POSTGRES_URL, or PGURI environment variable');
-    console.error('[Sequelize] Format: postgresql://user:password@host:port/database?sslmode=require');
-    console.error('[Sequelize] NOTE: If password contains special characters (@, /, etc.), they must be URL-encoded');
-    console.error('[Sequelize] Example: @ becomes %40, / becomes %2F');
-    throw new Error('DATABASE_URL is required for PostgreSQL');
-  }
-
-  // Parse and validate connection string
-  let connectionUrl = DATABASE_URL || '';
   
-  // Check if connection string needs password encoding
-  // If password contains @ but URL doesn't start with properly encoded format, fix it
-  try {
-    // Try to parse the URL to detect if it's malformed
-    const url = new URL(connectionUrl);
-    const hostname = url.hostname;
-    
-    // If hostname looks wrong (very short, no dots, etc.), password might not be encoded
-    if (hostname.length < 5 || (!hostname.includes('.') && !hostname.includes('localhost'))) {
-      console.warn('[Sequelize] WARNING: Connection string hostname looks invalid:', hostname);
-      console.warn('[Sequelize] This usually means password contains special characters that need URL encoding');
-      console.warn('[Sequelize] Please URL-encode your password (e.g., @ -> %40, / -> %2F)');
+  let connectionUrl = DATABASE_URL || '';
+  let isLocalDatabase = false;
+  
+  // If DATABASE_URL is not set, try to use config.json
+  if (!DATABASE_URL) {
+    try {
+      const config = require('../../config/config.json');
+      const dbConfig = config[process.env.NODE_ENV || 'postgres'] || config.postgres;
+      
+      if (dbConfig && dbConfig.host) {
+        // Build connection string from config.json
+        const host = dbConfig.host;
+        const port = dbConfig.port || 5432;
+        const database = dbConfig.database;
+        const username = dbConfig.username;
+        const password = dbConfig.password;
+        
+        connectionUrl = `postgresql://${username}:${password}@${host}:${port}/${database}`;
+        
+        // Check if this is a local database
+        isLocalDatabase = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+        
+        console.log('[Sequelize] Using config.json for database connection');
+        console.log('[Sequelize] Host:', host, isLocalDatabase ? '(local)' : '(remote)');
+      } else {
+        console.error('[Sequelize] ERROR: DATABASE_URL is required for PostgreSQL!');
+        console.error('[Sequelize] Please set DATABASE_URL, POSTGRES_URL, or PGURI environment variable');
+        console.error('[Sequelize] Or configure database in config/config.json');
+        throw new Error('DATABASE_URL is required for PostgreSQL');
+      }
+    } catch (error) {
+      if (error.code === 'MODULE_NOT_FOUND') {
+        console.error('[Sequelize] ERROR: DATABASE_URL is required for PostgreSQL!');
+        console.error('[Sequelize] Please set DATABASE_URL, POSTGRES_URL, or PGURI environment variable');
+        console.error('[Sequelize] Format: postgresql://user:password@host:port/database');
+        throw new Error('DATABASE_URL is required for PostgreSQL');
+      }
+      throw error;
     }
-  } catch (e) {
-    // URL parsing failed - might be malformed
-    console.error('[Sequelize] ERROR: Connection string appears to be malformed');
-    console.error('[Sequelize] Make sure passwords with special characters are URL-encoded');
-    console.error('[Sequelize] Special characters that need encoding: @ %40, / %2F, : %3A, # %23, ? %3F, & %26');
-    console.error(connectionUrl);
-    console.error(e);
-    throw new Error('Invalid DATABASE_URL format. Check password encoding.');
+  } else {
+    // Parse and validate connection string
+    try {
+      const url = new URL(connectionUrl);
+      const hostname = url.hostname;
+      
+      // Check if this is a local database
+      isLocalDatabase = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+      
+      // If hostname looks wrong (very short, no dots, etc.), password might not be encoded
+      if (!isLocalDatabase && (hostname.length < 5 || (!hostname.includes('.') && !hostname.includes('localhost')))) {
+        console.warn('[Sequelize] WARNING: Connection string hostname looks invalid:', hostname);
+        console.warn('[Sequelize] This usually means password contains special characters that need URL encoding');
+        console.warn('[Sequelize] Please URL-encode your password (e.g., @ -> %40, / -> %2F)');
+      }
+    } catch (e) {
+      // URL parsing failed - might be malformed
+      console.error('[Sequelize] ERROR: Connection string appears to be malformed');
+      console.error('[Sequelize] Make sure passwords with special characters are URL-encoded');
+      console.error('[Sequelize] Special characters that need encoding: @ %40, / %2F, : %3A, # %23, ? %3F, & %26');
+      console.error(connectionUrl);
+      throw new Error('Invalid DATABASE_URL format. Check password encoding.');
+    }
   }
   
   // Check if this is a Supabase connection
   const isSupabase = connectionUrl.includes('.supabase.co') || connectionUrl.includes('supabase');
-  
-  // For Supabase and cloud databases, we configure SSL via dialectOptions
-  // Don't add sslmode to URL as it can conflict with dialectOptions
-  // The dialectOptions will handle SSL configuration properly
   
   // Remove any existing sslmode from URL to avoid conflicts (we'll use dialectOptions instead)
   if (connectionUrl.includes('sslmode=')) {
@@ -84,22 +109,28 @@ if (DB_TYPE === 'mysql') {
     }
   }
 
-  // SSL configuration for dialect options (required for Supabase)
-  // Supabase uses self-signed certificates, so we must set rejectUnauthorized to false
-  // This allows the connection to proceed even though the cert chain can't be verified
-  const postgresDialectOptions = {
-    ssl: {
+  // SSL configuration - only enable for remote databases (not localhost)
+  const postgresDialectOptions = {};
+  
+  if (!isLocalDatabase) {
+    // For remote databases (Supabase, cloud databases), enable SSL
+    postgresDialectOptions.ssl = {
       require: true,              // Require SSL connection
       rejectUnauthorized: false  // Don't reject self-signed certificates (required for Supabase)
+    };
+    
+    if (isVercel || process.env.NODE_ENV !== 'production') {
+      console.log('[Sequelize] SSL configured via dialectOptions:', {
+        require: true,
+        rejectUnauthorized: false,
+        note: 'This allows self-signed certificates (required for Supabase)'
+      });
     }
-  };
-  
-  if (isVercel || process.env.NODE_ENV !== 'production') {
-    console.log('[Sequelize] SSL configured via dialectOptions:', {
-      require: true,
-      rejectUnauthorized: false,
-      note: 'This allows self-signed certificates (required for Supabase)'
-    });
+  } else {
+    // For local database, disable SSL
+    if (isVercel || process.env.NODE_ENV !== 'production') {
+      console.log('[Sequelize] Local database detected - SSL disabled');
+    }
   }
 
   // Log connection info (hide password, but show parsed hostname for debugging)
@@ -113,9 +144,10 @@ if (DB_TYPE === 'mysql') {
         parsedHostname: url.hostname,
         parsedPort: url.port || '5432',
         parsedDatabase: url.pathname?.replace('/', '') || 'unknown',
+        isLocalDatabase,
         isSupabase,
         sslInUrl: connectionUrl.includes('ssl'),
-        hasSSL: true,
+        hasSSL: !isLocalDatabase,
       });
     } catch (e) {
       const safeUrl = connectionUrl.replace(/:[^:@]+@/, ':****@');
@@ -123,9 +155,10 @@ if (DB_TYPE === 'mysql') {
         usingConnectionString: true,
         url: safeUrl,
         parseError: 'Could not parse URL for validation',
+        isLocalDatabase,
         isSupabase,
         sslInUrl: connectionUrl.includes('ssl'),
-        hasSSL: true,
+        hasSSL: !isLocalDatabase,
       });
     }
   }
@@ -134,7 +167,7 @@ if (DB_TYPE === 'mysql') {
     dialect: 'postgres',
     logging: false,
     pool: poolConfig,
-    dialectOptions: postgresDialectOptions, // SSL always enabled
+    dialectOptions: postgresDialectOptions, // SSL only for remote databases
     dialectModule: require('pg'),
   });
 }
