@@ -65,7 +65,7 @@ class UserTaskRepository {
           {
             model: this.userTaskEvidenceModel,
             as: 'evidences',
-            attributes: ['id', 'evidence_type', 'file_path', 'file_name', 'description', 'created_at']
+            attributes: ['id', 'user_task_id', 'url', 'created_at']
           }
         ]
       });
@@ -101,7 +101,7 @@ class UserTaskRepository {
           {
             model: this.userTaskEvidenceModel,
             as: 'evidences',
-            attributes: ['id', 'evidence_type', 'file_path', 'file_name', 'description', 'created_at']
+            attributes: ['id', 'user_task_id', 'url', 'created_at']
           }
         ]
       });
@@ -158,11 +158,6 @@ class UserTaskRepository {
         });
 
         matchingTaskGroupIds = matchingTaskGroups.map(tg => tg.toJSON().id);
-        
-        // If taskGroupModel is available but no matching task groups found, return empty array
-        if (matchingTaskGroupIds.length === 0) {
-          return [];
-        }
       }
       
       const whereClause = { user_id: userId };
@@ -173,7 +168,7 @@ class UserTaskRepository {
         where: whereClause,
         limit: parseInt(limit) * 10, // Increase limit to account for child tasks
         offset: parseInt(offset),
-        order: [['created_at', 'DESC']],
+        order: [['id', 'ASC']],
         include: [
           {
             model: this.taskModel,
@@ -184,10 +179,18 @@ class UserTaskRepository {
           {
             model: this.userTaskEvidenceModel,
             as: 'evidences',
-            attributes: ['id', 'evidence_type', 'file_path', 'file_name', 'description', 'created_at']
+            attributes: ['id', 'user_task_id', 'url', 'created_at']
           }
         ]
       });
+
+      ctx.log?.info({ 
+        userId, 
+        rowsCount: rows.length, 
+        totalCount: count,
+        limit: parseInt(limit) * 10,
+        offset: parseInt(offset)
+      }, 'UserTaskRepository.findByUserId - Initial query results');
 
       // Separate main tasks and child tasks
       const mainTasksRows = [];
@@ -209,13 +212,21 @@ class UserTaskRepository {
       });
 
       // Filter main tasks by task_group
+      // If no task association exists, include the task (don't filter it out)
       const filteredMainTasks = matchingTaskGroupIds.length > 0
         ? mainTasksRows.filter(ut => {
             const utJson = ut.toJSON();
             const task = utJson.task;
-            return task && task.task_group_id && matchingTaskGroupIds.includes(task.task_group_id);
+            // Include tasks without task associations, or tasks whose task_group_id matches
+            return !task || !task.task_group_id || matchingTaskGroupIds.includes(task.task_group_id);
           })
         : mainTasksRows;
+
+      ctx.log?.info({ 
+        matchingTaskGroupIdsCount: matchingTaskGroupIds.length,
+        mainTasksRowsCount: mainTasksRows.length,
+        filteredMainTasksCount: filteredMainTasks.length
+      }, 'UserTaskRepository.findByUserId - Task group filtering');
 
       // Get IDs of filtered main tasks
       const filteredMainTaskIds = new Set(filteredMainTasks.map(ut => ut.toJSON().id));
@@ -228,6 +239,12 @@ class UserTaskRepository {
 
       // Combine filtered main tasks and their child tasks
       const allRows = [...filteredMainTasks, ...filteredChildTasks];
+
+      ctx.log?.info({ 
+        childTasksRowsCount: childTasksRows.length,
+        filteredChildTasksCount: filteredChildTasks.length,
+        allRowsCount: allRows.length
+      }, 'UserTaskRepository.findByUserId - After combining main and child tasks');
 
       // Process user tasks to group child tasks under main tasks
       const userTasksJson = allRows.map(ut => {
@@ -243,10 +260,12 @@ class UserTaskRepository {
       // Group by code and find the newest generation
       const codeToTasksMap = new Map(); // Map code -> array of user tasks with that code
       const codeToMaxDateMap = new Map(); // Map code -> max created_at for that code
+      const tasksWithoutCode = []; // Tasks without codes
       
       userTasksJson.forEach(userTask => {
         if (!userTask.code) {
-          // If no code, skip it (shouldn't happen, but handle edge case)
+          // If no code, include it separately
+          tasksWithoutCode.push(userTask);
           return;
         }
         
@@ -276,11 +295,30 @@ class UserTaskRepository {
       });
 
       // Get all user tasks from the newest generation (code)
-      const filteredUserTasks = newestCode ? codeToTasksMap.get(newestCode) || [] : [];
+      // If no codes exist, return all tasks (including those without codes)
+      let filteredUserTasks = [];
+      if (newestCode) {
+        filteredUserTasks = codeToTasksMap.get(newestCode) || [];
+      } else if (codeToTasksMap.size === 0) {
+        // No codes found at all, return all tasks including those without codes
+        filteredUserTasks = userTasksJson;
+      } else {
+        // Codes exist but couldn't determine newest, return all tasks with codes
+        codeToTasksMap.forEach((tasks) => {
+          filteredUserTasks.push(...tasks);
+        });
+      }
+      
+      // Include tasks without codes if we're not filtering by newest code
+      if (!newestCode && tasksWithoutCode.length > 0) {
+        filteredUserTasks.push(...tasksWithoutCode);
+      }
 
       // Log for debugging
       ctx.log?.info({ 
         newestCode, 
+        codeToTasksMapSize: codeToTasksMap.size,
+        tasksWithoutCodeCount: tasksWithoutCode.length,
         filteredTasksCount: filteredUserTasks.length,
         mainTasksCount: filteredUserTasks.filter(ut => ut.is_main_task).length,
         childTasksCount: filteredUserTasks.filter(ut => !ut.is_main_task && ut.parent_user_task_id).length,
@@ -441,6 +479,9 @@ class UserTaskRepository {
         return userTaskObj;
       });
 
+      // Sort result by user_task_id
+      result.sort((a, b) => a.user_task_id - b.user_task_id);
+
       return result;
     } catch (error) {
       ctx.log?.error({ userId, queryParams, error }, 'UserTaskRepository.findByUserId_error');
@@ -474,7 +515,7 @@ class UserTaskRepository {
           {
             model: this.userTaskEvidenceModel,
             as: 'evidences',
-            attributes: ['id', 'evidence_type', 'file_path', 'file_name', 'description', 'created_at']
+            attributes: ['id', 'user_task_id', 'url', 'created_at']
           }
         ]
       });
