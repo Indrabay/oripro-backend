@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
 const path = require('path');
+const net = require('net');
 
 dotenv.config();
 
@@ -56,6 +57,7 @@ const TaskParentRepository = require('./repositories/TaskParent');
 const ScanInfoRepository = require('./repositories/ScanInfo');
 const UserTaskRepository = require('./repositories/UserTask');
 const UserTaskEvidenceRepository = require('./repositories/UserTaskEvidence');
+const TenantPaymentLogRepository = require('./repositories/TenantPaymentLog');
 
 // define usecase module
 const authUc = require('./usecases/Auth');
@@ -72,6 +74,7 @@ const userTaskUc = require('./usecases/UserTask');
 const scanInfoUc = require('./usecases/ScanInfo');
 const complaintReportUc = require('./usecases/ComplaintReport');
 const attendanceUc = require('./usecases/Attendance');
+const tenantPaymentLogUc = require('./usecases/TenantPaymentLog');
 
 // define models database
 const {User} = require('./models/User');
@@ -104,6 +107,7 @@ const modelTaskGroup = require('./models/TaskGroup');
 const modelTaskParent = require('./models/TaskParent');
 const modelUserTask = require('./models/UserTask');
 const modelUserTaskEvidence = require('./models/UserTaskEvidence');
+const modelTenantPaymentLog = require('./models/TenantPaymentLog');
 
 // initialize repository
 const userRepository = new UserRepository(User, modelRole);
@@ -112,7 +116,7 @@ const assetRepository = new AssetRepository(Asset, modelAdminAsset, User);
 const assetLogRepository = new AssetLogRepository(modelAssetLog, User);
 const unitRepository = new UnitRepository(modelUnit, Asset, User);
 const roleRepository = new RoleRepository(modelRole, modelRoleMenuPermission);
-const tenantRepository = new TenantRepository(Tenant, User);
+const tenantRepository = new TenantRepository(Tenant, User, modelTenantCategory);
 const tenantAttachmentRepository = new TenantAttachmentRepository(TenantAttachmentModel)
 const mapTenantCategoryRepository = new MapTenantCategoryRepository(MapTenantCategory)
 const tenantUnitRepository = new TenantUnitRepository(modelTenantUnit)
@@ -135,6 +139,7 @@ const taskParentRepository = new TaskParentRepository(modelTaskParent);
 const scanInfoRepository = new ScanInfoRepository(modelScanInfo, User, Asset);
 const userTaskRepository = new UserTaskRepository(modelUserTask, User, modelTask, modelUserTaskEvidence, modelTaskSchedule, modelTaskGroup, modelTaskParent);
 const userTaskEvidenceRepository = new UserTaskEvidenceRepository(modelUserTaskEvidence, modelUserTask);
+const tenantPaymentLogRepository = new TenantPaymentLogRepository(modelTenantPaymentLog, Tenant, User);
 
 // Setup model associations
 const models = {
@@ -168,6 +173,7 @@ const models = {
   TaskParent: modelTaskParent,
   UserTask: modelUserTask,
   UserTaskEvidence: modelUserTaskEvidence,
+  TenantPaymentLog: modelTenantPaymentLog,
 };
 
 // Setup associations
@@ -205,13 +211,14 @@ const scanInfoUsecase = new scanInfoUc(scanInfoRepository);
 const complaintReportUsecase = new complaintReportUc(complaintReportRepository, userRepository, tenantRepository);
 const attendanceRepository = new AttendanceRepository();
 const attendanceUsecase = new attendanceUc(attendanceRepository);
+const tenantPaymentLogUsecase = new tenantPaymentLogUc(tenantPaymentLogRepository, tenantRepository);
 
 // initalize router
 const authRouter = auth.InitAuthRouter(authUsecase);
 const assetRouter = asset.InitAssetRouter(assetUsecase);
 const userRouter = user.InitUserRouter(userUsecase, userAccessMenuUsecase);
 const unitRouter = units.InitUnitRouter(unitUsecase);
-const tenantRouter = tenant.InitTenantRouter(tenantUsecase);
+const tenantRouter = tenant.InitTenantRouter(tenantUsecase, tenantPaymentLogUsecase);
 const roleRouter = InitRoleRouter(roleUsecase);
 const menuRouter = InitMenuRouter(menuUsecase);
 const attendanceRouter = InitAttendanceRouter(attendanceUsecase);
@@ -225,7 +232,7 @@ const userTaskRouter = require('./routes/userTasks').InitUserTaskRouter(userTask
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001', 'https://oripro-frontend-62c6vs70u-ibes-projects-97d001d5.vercel.app'],
+  origin: ['http://localhost:3000', 'http://localhost:3002', 'https://oripro-frontend-62c6vs70u-ibes-projects-97d001d5.vercel.app'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -401,12 +408,39 @@ process.on('unhandledRejection', (reason, promise) => {
   // Don't exit the process, but log it
 });
 
+// Function to find an available port
+function findAvailablePort(startPort = 3000) {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    
+    server.listen(startPort, () => {
+      const port = server.address().port;
+      server.close(() => {
+        resolve(port);
+      });
+    });
+    
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        // Port is in use, try the next one
+        findAvailablePort(startPort + 1).then(resolve).catch(reject);
+      } else {
+        reject(err);
+      }
+    });
+  });
+}
+
 // Only start server when not running on Vercel
 // Vercel serverless functions don't need app.listen()
 if (process.env.VERCEL !== '1' && !process.env.VERCEL_ENV) {
-  const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
-    console.log(`Server listening on http://localhost:${PORT}`);
+  findAvailablePort(3000).then((PORT) => {
+    app.listen(PORT, () => {
+      console.log(`Server listening on http://localhost:${PORT}`);
+    });
+  }).catch((err) => {
+    console.error('Failed to find available port:', err);
+    process.exit(1);
   });
 }
 

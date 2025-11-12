@@ -87,6 +87,7 @@ class TenantUseCase {
           rent_price: data.rent_price || null,
           down_payment: data.down_payment || null,
           deposit: data.deposit || null,
+          category_id: data.category_id || null,
           status: 2, // pending
         };
         const tenant = await this.tenantRepository.create(
@@ -107,13 +108,6 @@ class TenantUseCase {
             tenant,
             data.contract_documents,
             "contract",
-            t,
-            ctx
-          );
-          await this.saveCategories(
-            tenant,
-            data.categories,
-            data.createdBy,
             t,
             ctx
           );
@@ -260,19 +254,9 @@ class TenantUseCase {
           tenant.contract_documents = contractAttachments;
         }
 
-        const tenantCategories =
-          await this.tenantCategoryMapRepo.findByTenantID(tenant.id);
-        if (tenantCategories.length > 0) {
-          let categories = [];
-          for (let i = 0; i < tenantCategories.length; i++) {
-            let category = await this.tenantCategoryRepo.getByID(
-              tenantCategories[i].category_id
-            );
-
-            categories.push(category);
-          }
-
-          tenant.categories = categories;
+        // Category is now included via association in repository
+        if (tenant.category) {
+          tenant.category = tenant.category;
         }
       }
 
@@ -326,19 +310,8 @@ class TenantUseCase {
             tenant.contract_documents = contractAttachments;
           }
 
-          // Get tenant categories
-          const tenantCategories =
-            await this.tenantCategoryMapRepo.findByTenantID(tenant.id);
-          if (tenantCategories.length > 0) {
-            let categories = [];
-            for (let i = 0; i < tenantCategories.length; i++) {
-              let category = await this.tenantCategoryRepo.getByID(
-                tenantCategories[i].category_id
-              );
-              categories.push(category);
-            }
-            tenant.categories = categories;
-          }
+          // Category is now included via association in repository
+          // No need to fetch separately
 
           // Convert status to string
           tenant.status = TenantStatusIntToStr[tenant.status];
@@ -454,8 +427,7 @@ class TenantUseCase {
       // Delete tenant attachments
       await this.tenantAttachmentRepository.deleteByTenantId(id, { ...ctx, transaction });
       
-      // Delete tenant category mappings
-      await this.tenantCategoryMapRepo.deleteByTenantId(id, { ...ctx, transaction });
+      // Category is now stored directly in tenant, no need to delete mappings
       
       // Delete tenant
       const result = await this.tenantRepository.delete(id, { ...ctx, transaction });

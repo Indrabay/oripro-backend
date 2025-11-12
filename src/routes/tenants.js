@@ -3,7 +3,7 @@ const { body, validationResult, param } = require('express-validator');
 const { authMiddleware, ensureRole } = require('../middleware/auth');
 const { createResponse } = require('../services/response');
 
-function InitTenantRouter(TenantUseCase) {
+function InitTenantRouter(TenantUseCase, TenantPaymentLogUsecase) {
   const router = Router();
 
   router.use(authMiddleware, ensureRole);
@@ -31,7 +31,7 @@ function InitTenantRouter(TenantUseCase) {
       body('new_user.role_id').optional(),
       body('new_user.phone').optional(),
       body('new_user.gender').optional(),
-      body('categories').notEmpty().isArray(),
+      body('category_id').isInt().withMessage('category_id must be a valid integer'),
     ],
     async (req, res) => {
     try {
@@ -54,7 +54,7 @@ function InitTenantRouter(TenantUseCase) {
         rent_price,
         down_payment,
         deposit,
-        categories,
+        category_id,
         user_id,
         new_user,
       } = req.body;
@@ -63,7 +63,7 @@ function InitTenantRouter(TenantUseCase) {
       console.log("TenantRouter.createTenant - extracted new_user:", new_user);
 
       const tenant = await TenantUseCase.createTenant({
-        name, tenant_identifications, contract_documents, contract_begin_at, unit_ids, rent_duration, rent_duration_unit, rent_price, down_payment, deposit, user_id, new_user, categories,createdBy: req.auth.userId
+        name, tenant_identifications, contract_documents, contract_begin_at, unit_ids, rent_duration, rent_duration_unit, rent_price, down_payment, deposit, user_id, new_user, category_id,createdBy: req.auth.userId
       }, {userId: req.auth.userId, log: req.log});
       res.status(201).json(createResponse(tenant, "success", 201));
     } catch (err) {
@@ -183,6 +183,78 @@ function InitTenantRouter(TenantUseCase) {
     } catch (err) {
       req.log?.error({ tenant_id: req.params.id }, `TenantRouter.getDepositoLogs_error: ${err.message}`);
       res.status(500).json(createResponse(null, "internal server error", 500));
+    }
+  });
+
+  // Payment Log endpoints
+  router.post('/:id/payments', [
+    param('id').isUUID().withMessage('ID must be a valid UUID'),
+    body('amount').isFloat({ min: 0 }).withMessage('amount must be a positive number'),
+    body('payment_date').optional().isISO8601().withMessage('payment_date must be a valid date'),
+    body('payment_method').isIn(['cash', 'bank_transfer', 'qris','other']).withMessage('payment_method must be one of: cash, bank_transfer, credit_card, debit_card, e_wallet, check, other'),
+    body('notes').optional().isString(),
+  ], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json(createResponse(null, "bad request", 400, false, {}, errors));
+    }
+    
+    try {
+      req.log?.info({ tenant_id: req.params.id, body: req.body }, "TenantRouter.createPaymentLog");
+      const paymentLog = await TenantPaymentLogUsecase.createPaymentLog({
+        tenant_id: req.params.id,
+        amount: req.body.amount,
+        payment_date: req.body.payment_date,
+        payment_method: req.body.payment_method,
+        notes: req.body.notes,
+      }, {
+        userId: req.auth.userId,
+        log: req.log
+      });
+
+      res.status(201).json(createResponse(paymentLog, "Payment log created successfully", 201));
+    } catch (err) {
+      req.log?.error({ tenant_id: req.params.id }, `TenantRouter.createPaymentLog_error: ${err.message}`);
+      if (err.message === 'Tenant not found') {
+        res.status(404).json(createResponse(null, "Tenant not found", 404));
+      } else {
+        res.status(500).json(createResponse(null, "internal server error", 500));
+      }
+    }
+  });
+
+  router.get('/:id/payments', [
+    param('id').isUUID().withMessage('ID must be a valid UUID')
+  ], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json(createResponse(null, "bad request", 400, false, {}, errors));
+    }
+    
+    try {
+      req.log?.info({ tenant_id: req.params.id, query: req.query }, "TenantRouter.getPaymentLogs");
+      const result = await TenantPaymentLogUsecase.getPaymentLogsByTenantId(req.params.id, {
+        limit: req.query.limit || 10,
+        offset: req.query.offset || 0,
+        orderBy: req.query.orderBy || 'created_at',
+        order: req.query.order || 'DESC',
+      }, {
+        userId: req.auth.userId,
+        log: req.log
+      });
+
+      res.status(200).json(createResponse(result.rows, "success", 200, true, {
+        total: result.count,
+        limit: result.limit,
+        offset: result.offset
+      }));
+    } catch (err) {
+      req.log?.error({ tenant_id: req.params.id }, `TenantRouter.getPaymentLogs_error: ${err.message}`);
+      if (err.message === 'Tenant not found') {
+        res.status(404).json(createResponse(null, "Tenant not found", 404));
+      } else {
+        res.status(500).json(createResponse(null, "internal server error", 500));
+      }
     }
   });
 

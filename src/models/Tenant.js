@@ -74,6 +74,15 @@ Tenant.init({
     type: DataTypes.FLOAT,
     allowNull: true,
   },
+  payment_term: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: 'Payment term: 0=year, 1=month'
+  },
+  category_id: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+  },
   status: {
     type: DataTypes.INTEGER,
     defaultValue: 2, // pending
@@ -119,7 +128,11 @@ Tenant.associate = (models) => {
   Tenant.belongsTo(models.User, {
     foreignKey: 'user_id',
     as: 'user'
-  })
+  });
+  Tenant.belongsTo(models.TenantCategory, {
+    foreignKey: 'category_id',
+    as: 'category'
+  });
 }
 
 module.exports = {Tenant, DurationUnit, DurationUnitStr, TenantStatusIntToStr, TenantStatusStrToInt};
