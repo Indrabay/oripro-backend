@@ -106,11 +106,42 @@ class TaskRepository {
       const { Op } = require('sequelize');
       
       const whereClause = {};
+      let taskIdsToInclude = null; // Will contain IDs of tasks to include (parent + children)
       
       // Add filters if provided
       if (filters.task_group_id) {
-        whereClause.task_group_id = filters.task_group_id;
+        // First, find all tasks with the specified task_group_id
+        const parentTasks = await this.taskModel.findAll({
+          where: { task_group_id: filters.task_group_id },
+          attributes: ['id']
+        });
+        
+        const parentTaskIds = parentTasks.map(t => t.id);
+        ctx.log?.info({ task_group_id: filters.task_group_id, parentTaskIds }, "TaskRepository.findAll - found parent tasks");
+        
+        if (parentTaskIds.length > 0) {
+          // Find all child tasks of these parent tasks (even if child doesn't have task_group_id)
+          const childRelations = await this.taskParentModel.findAll({
+            where: { parent_task_id: { [Op.in]: parentTaskIds } },
+            attributes: ['child_task_id']
+          });
+          
+          const childTaskIds = childRelations.map(rel => rel.child_task_id);
+          ctx.log?.info({ childTaskIds }, "TaskRepository.findAll - found child tasks");
+          
+          // Combine parent and child task IDs
+          taskIdsToInclude = [...new Set([...parentTaskIds, ...childTaskIds])];
+          ctx.log?.info({ taskIdsToInclude }, "TaskRepository.findAll - all task IDs to include");
+          
+          // Use task IDs in where clause instead of task_group_id
+          whereClause.id = { [Op.in]: taskIdsToInclude };
+        } else {
+          // No tasks found with this task_group_id, return empty result
+          taskIdsToInclude = [];
+          whereClause.id = { [Op.in]: [] }; // This will return no results
+        }
       }
+      
       if (filters.is_main_task !== undefined) {
         whereClause.is_main_task = filters.is_main_task;
       }
