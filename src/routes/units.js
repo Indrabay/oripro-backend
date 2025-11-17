@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { body, validationResult, param } = require('express-validator');
+const { body, validationResult, param, query } = require('express-validator');
 const { authMiddleware, ensureRole } = require('../middleware/auth');
 const { createResponse } = require('../services/response');
 
@@ -40,7 +40,14 @@ function InitUnitRouter(UnitUsecase) {
     }
   );
 
-  router.get('/', async (req, res) => {
+  router.get('/', [
+    query('status').optional().isIn(['available', 'occupied', 'maintenance', 'reserved', 'inactive', 'out_of_order', '0', '1', '2', '3', '4', '5']).withMessage('status must be one of: available, occupied, maintenance, reserved, inactive, out_of_order, or 0, 1, 2, 3, 4, 5')
+  ], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json(createResponse(null, "bad request", 400, false, {}, errors));
+    }
+    
     req.log?.info({}, 'route_units_list');
     let { offset, limit } = req.query;
     if (!offset) offset = 0;
@@ -85,12 +92,13 @@ function InitUnitRouter(UnitUsecase) {
       body('electrical_power').optional().isNumeric(),
       body('electrical_unit').optional().isString(),
       body('is_toilet_exist').optional().isBoolean(),
-      body('description').optional().isString()
+      body('description').optional().isString(),
+      body('status').optional().isIn(['available', 'occupied', 'maintenance', 'reserved', 'inactive', 'out_of_order']).withMessage('status must be one of: available, occupied, maintenance, reserved, inactive, out_of_order')
     ],
     async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json(createResponse(null, "bad request", 400, false, {}, errors));
-      const { name, size, electrical_power, electrical_unit, is_toilet_exist, description } = req.body;
+      const { name, size, electrical_power, electrical_unit, is_toilet_exist, description, status } = req.body;
       req.log?.info({ id: req.params.id }, 'route_units_update');
       try {
         const unit = await UnitUsecase.updateUnit(req.params.id, {
@@ -100,6 +108,7 @@ function InitUnitRouter(UnitUsecase) {
           electrical_unit,
           is_toilet_exist,
           description,
+          status,
           updatedBy: req.auth.userId
         }, { requestId: req.requestId, log: req.log, roleName: req.auth.roleName, userId: req.auth.userId });
         if (!unit) return res.status(404).json(createReponse(null, 'not found', 404 ));

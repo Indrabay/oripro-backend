@@ -86,9 +86,10 @@ class UnitUsecase {
       is_toilet_exist: data.is_toilet_exist ?? unit.is_toilet_exist,
       description: data.description ?? unit.description,
       is_deleted: data.is_deleted ?? unit.is_deleted,
+      status: data.status ?? unit.status,
       updated_by: ctx.userId
     };
-    const updatedUnit = await this.unitRepository.update(id, updatedData);
+    const updatedUnit = await this.unitRepository.update(id, updatedData, ctx);
     if (updatedUnit) {
       console.log('aman update unit')
       // Create log entry - only store changed data
@@ -137,6 +138,11 @@ class UnitUsecase {
       if (data.is_deleted !== undefined && data.is_deleted !== unit.is_deleted) {
         oldData.is_deleted = unit.is_deleted;
         newData.is_deleted = data.is_deleted;
+      }
+      if (data.status !== undefined && data.status !== unit.status) {
+        const { UnitStatusIntToStr } = require("../models/Unit");
+        oldData.status = UnitStatusIntToStr[unit.status] || unit.status;
+        newData.status = data.status;
       }
 
       // Debug logging for comparison results

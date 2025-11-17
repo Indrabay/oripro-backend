@@ -1,5 +1,6 @@
 const { Op } = require("sequelize");
 const sequelize = require("../models/sequelize");
+const { UnitStatusStrToInt, UnitStatusIntToStr } = require('../models/Unit');
 
 class UnitRepository {
   constructor(unitModel, assetModel, userModel) {
@@ -19,7 +20,19 @@ class UnitRepository {
       is_toilet_exist,
       description,
       is_deleted,
+      status,
     } = unitData;
+    
+    // Convert status from string to integer if provided
+    let statusInt = status;
+    if (status && typeof status === 'string') {
+      const { UnitStatusStrToInt } = require('../models/Unit');
+      statusInt = UnitStatusStrToInt[status];
+      if (statusInt === undefined) {
+        throw new Error(`Invalid status: ${status}. Must be 'available', 'occupied', 'maintenance', 'reserved', 'inactive', or 'out_of_order'`);
+      }
+    }
+    
     const unit = await this.unitModel.create(
       {
         name,
@@ -30,6 +43,7 @@ class UnitRepository {
         is_toilet_exist,
         description,
         is_deleted,
+        status: statusInt !== undefined ? statusInt : 0, // Default to 0 (available) if not provided
         created_by: ctx.userId,
       },
       { transaction: tx }
@@ -59,19 +73,27 @@ class UnitRepository {
       ],
     });
     const result = unit ? unit.toJSON() : null;
-    result.created_by = result.createdBy;
-    result.updated_by = result.updatedBy;
-    result.asset = result.asset;
-    delete result.createdBy;
-    delete result.updatedBy;
-    delete result.asset_id;
+    if (result) {
+      // Convert status from integer to string
+      const { UnitStatusIntToStr } = require('../models/Unit');
+      if (result.status !== undefined && result.status !== null) {
+        result.status = UnitStatusIntToStr[result.status] || result.status;
+      }
+      
+      result.created_by = result.createdBy;
+      result.updated_by = result.updatedBy;
+      result.asset = result.asset;
+      delete result.createdBy;
+      delete result.updatedBy;
+      delete result.asset_id;
+    }
     return result;
   }
 
   async findAll(filter = {}, ctx) {
     ctx.log?.info({}, "UnitRepository.findAll");
     let whereQuery = {};
-    if (filter.asset_id || filter.name || filter.is_toilet_exist) {
+    if (filter.asset_id || filter.name || filter.is_toilet_exist || filter.status) {
       whereQuery.where = {};
       if (filter.asset_id) {
         whereQuery.where.asset_id = filter.asset_id;
@@ -86,6 +108,23 @@ class UnitRepository {
 
       if (filter.is_toilet_exist) {
         whereQuery.where.is_toilet_exist = filter.is_toilet_exist;
+      }
+
+      // Add status filter if provided
+      if (filter.status !== undefined && filter.status !== null && filter.status !== '') {
+        // Convert string status to integer if needed
+        let statusInt = filter.status;
+        if (typeof filter.status === 'string') {
+          statusInt = UnitStatusStrToInt[filter.status];
+          if (statusInt === undefined) {
+            // If string doesn't match, try parsing as integer
+            statusInt = parseInt(filter.status, 10);
+            if (isNaN(statusInt)) {
+              throw new Error(`Invalid status: ${filter.status}. Must be 'available', 'occupied', 'maintenance', 'reserved', 'inactive', 'out_of_order', or 0, 1, 2, 3, 4, 5`);
+            }
+          }
+        }
+        whereQuery.where.status = statusInt;
       }
     }
 
@@ -140,6 +179,12 @@ class UnitRepository {
     const result = {
       units: data.rows.map((u) => {
         const unit = u.toJSON();
+        
+        // Convert status from integer to string
+        if (unit.status !== undefined && unit.status !== null) {
+          unit.status = UnitStatusIntToStr[unit.status] || unit.status;
+        }
+        
         unit.created_by = u.createdBy;
         unit.updated_by = u.updatedBy;
         unit.asset = u.asset;
@@ -154,10 +199,40 @@ class UnitRepository {
     return result;
   }
 
-  async update(id, updateData) {
+  async update(id, updateData, ctx = {}) {
+    ctx.log?.info({ unit_id: id, updateData }, "UnitRepository.update");
     const unit = await this.unitModel.findByPk(id);
-    if (!unit) return null;
-    return await unit.update(updateData);
+    if (!unit) {
+      ctx.log?.warn({ unit_id: id }, "UnitRepository.update - unit not found");
+      return null;
+    }
+    
+    // Convert status from string to integer if provided
+    const data = { ...updateData };
+    if (data.status !== undefined && data.status !== null) {
+      if (typeof data.status === 'string') {
+        data.status = UnitStatusStrToInt[data.status];
+        if (data.status === undefined) {
+          throw new Error(`Invalid status: ${updateData.status}. Must be 'available', 'occupied', 'maintenance', 'reserved', 'inactive', or 'out_of_order'`);
+        }
+      }
+      // If status is already an integer, use it directly
+    }
+    
+    ctx.log?.info({ unit_id: id, data_to_update: data, transaction: !!ctx.transaction }, "UnitRepository.update - calling unit.update");
+    const updatedUnit = await unit.update(data, { transaction: ctx.transaction });
+    
+    // Convert status back to string for response
+    if (updatedUnit) {
+      const { UnitStatusIntToStr } = require('../models/Unit');
+      const unitJson = updatedUnit.toJSON();
+      if (unitJson.status !== undefined && unitJson.status !== null) {
+        unitJson.status = UnitStatusIntToStr[unitJson.status] || unitJson.status;
+      }
+      return unitJson;
+    }
+    
+    return updatedUnit;
   }
 
   async delete(id) {

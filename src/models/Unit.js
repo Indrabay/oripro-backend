@@ -1,6 +1,24 @@
 const { DataTypes, Model } = require("sequelize");
 const sequelize = require("./sequelize");
 
+const UnitStatusStrToInt = {
+  'available': 0,
+  'occupied': 1,
+  'maintenance': 2,
+  'reserved': 3,
+  'inactive': 4,
+  'out_of_order': 5
+};
+
+const UnitStatusIntToStr = {
+  0: 'available',
+  1: 'occupied',
+  2: 'maintenance',
+  3: 'reserved',
+  4: 'inactive',
+  5: 'out_of_order'
+};
+
 class Unit extends Model {}
 
 Unit.init(
@@ -39,6 +57,12 @@ Unit.init(
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
+    status: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0, // 0 = available
+      comment: 'Status: 0=available, 1=occupied, 2=maintenance, 3=reserved, 4=inactive, 5=out_of_order'
+    },
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
@@ -62,7 +86,11 @@ Unit.init(
     modelName: "Unit",
     tableName: "units",
     timestamps: false,
-    indexes: [{ fields: ["code"] }, { fields: ["asset_id"] }],
+    indexes: [
+      { fields: ["code"] }, 
+      { fields: ["asset_id"] },
+      { fields: ["status"] }
+    ],
   }
 );
 
@@ -81,4 +109,4 @@ Unit.associate = (models) => {
   });
 };
 
-module.exports = Unit;
+module.exports = { Unit, UnitStatusStrToInt, UnitStatusIntToStr };

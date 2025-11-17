@@ -276,6 +276,8 @@ class TenantUseCase {
 
   async saveTenantUnits(tenant, data, t, ctx) {
     ctx.log?.info({ unit_ids: data }, "TenantUsecase.saveTenantUnits");
+    const { UnitStatusStrToInt } = require("../models/Unit");
+    
     for (let i = 0; i < data.length; i++) {
       let dataUnit = {
         tenant_id: tenant.id,
@@ -283,6 +285,16 @@ class TenantUseCase {
       };
 
       await this.tenantUnitRepository.create(dataUnit, t, ctx);
+      
+      // Update unit status to 'occupied' when tenant is created
+      ctx.log?.info({ unit_id: data[i], status: UnitStatusStrToInt['occupied'] }, "TenantUsecase.saveTenantUnits - updating unit status to occupied");
+      const updateCtx = { ...ctx, transaction: t };
+      const updatedUnit = await this.unitRepository.update(data[i], {
+        status: UnitStatusStrToInt['occupied'], // 1 = occupied
+        updated_by: ctx.userId,
+      }, updateCtx);
+      
+      ctx.log?.info({ unit_id: data[i], updated: !!updatedUnit }, "TenantUsecase.saveTenantUnits - unit status updated");
     }
   }
 
@@ -549,9 +561,23 @@ class TenantUseCase {
 
       await this.tenantLogRepository.create(tenantLog, { ...ctx, transaction });
       
+      // Get tenant units before deleting to update their status
+      const tenantUnits = await this.tenantUnitRepository.getByTenantID(id);
+      
       // Delete related data first
       // Delete tenant units
       await this.tenantUnitRepository.deleteByTenantId(id, { ...ctx, transaction });
+      
+      // Update unit status back to 'available' when tenant is deleted
+      const { UnitStatusStrToInt } = require("../models/Unit");
+      if (tenantUnits && tenantUnits.length > 0) {
+        for (let i = 0; i < tenantUnits.length; i++) {
+          await this.unitRepository.update(tenantUnits[i].unit_id, {
+            status: UnitStatusStrToInt['available'], // 0 = available
+            updated_by: ctx.userId,
+          }, { ...ctx, transaction });
+        }
+      }
       
       // Delete tenant attachments
       await this.tenantAttachmentRepository.deleteByTenantId(id, { ...ctx, transaction });
