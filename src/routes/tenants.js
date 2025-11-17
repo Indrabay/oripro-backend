@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { body, validationResult, param } = require('express-validator');
+const { body, validationResult, param, query } = require('express-validator');
 const { authMiddleware, ensureRole } = require('../middleware/auth');
 const { createResponse } = require('../services/response');
 
@@ -17,7 +17,8 @@ function InitTenantRouter(TenantUseCase, TenantPaymentLogUsecase) {
       body('unit_ids').notEmpty().isArray(),
       body('contract_begin_at').notEmpty(),
       body('rent_duration').isNumeric(),
-      body('rent_duration_unit').notEmpty().isString(),
+      body('rent_duration_unit').notEmpty().isInt({ min: 0, max: 1 }).withMessage('rent_duration_unit must be 0 (year) or 1 (month)'),
+      body('payment_term').optional().isInt({ min: 0, max: 1 }).withMessage('payment_term must be 0 (year) or 1 (month)'),
       body('rent_price').optional().isFloat(),
       body('down_payment').optional().isFloat(),
       body('deposit').optional().isFloat(),
@@ -51,6 +52,7 @@ function InitTenantRouter(TenantUseCase, TenantPaymentLogUsecase) {
         contract_begin_at,
         rent_duration,
         rent_duration_unit,
+        payment_term,
         rent_price,
         down_payment,
         deposit,
@@ -63,7 +65,7 @@ function InitTenantRouter(TenantUseCase, TenantPaymentLogUsecase) {
       console.log("TenantRouter.createTenant - extracted new_user:", new_user);
 
       const tenant = await TenantUseCase.createTenant({
-        name, tenant_identifications, contract_documents, contract_begin_at, unit_ids, rent_duration, rent_duration_unit, rent_price, down_payment, deposit, user_id, new_user, category_id,createdBy: req.auth.userId
+        name, tenant_identifications, contract_documents, contract_begin_at, unit_ids, rent_duration, rent_duration_unit, payment_term, rent_price, down_payment, deposit, user_id, new_user, category_id,createdBy: req.auth.userId
       }, {userId: req.auth.userId, log: req.log});
       res.status(201).json(createResponse(tenant, "success", 201));
     } catch (err) {
@@ -191,6 +193,7 @@ function InitTenantRouter(TenantUseCase, TenantPaymentLogUsecase) {
     param('id').isUUID().withMessage('ID must be a valid UUID'),
     body('amount').isFloat({ min: 0 }).withMessage('amount must be a positive number'),
     body('payment_date').optional().isISO8601().withMessage('payment_date must be a valid date'),
+    body('payment_deadline').optional().isISO8601().withMessage('payment_deadline must be a valid date'),
     body('payment_method').isIn(['cash', 'bank_transfer', 'qris','other']).withMessage('payment_method must be one of: cash, bank_transfer, credit_card, debit_card, e_wallet, check, other'),
     body('notes').optional().isString(),
   ], async (req, res) => {
@@ -205,6 +208,7 @@ function InitTenantRouter(TenantUseCase, TenantPaymentLogUsecase) {
         tenant_id: req.params.id,
         amount: req.body.amount,
         payment_date: req.body.payment_date,
+        payment_deadline: req.body.payment_deadline,
         payment_method: req.body.payment_method,
         notes: req.body.notes,
       }, {
@@ -224,7 +228,8 @@ function InitTenantRouter(TenantUseCase, TenantPaymentLogUsecase) {
   });
 
   router.get('/:id/payments', [
-    param('id').isUUID().withMessage('ID must be a valid UUID')
+    param('id').isUUID().withMessage('ID must be a valid UUID'),
+    query('status').optional().isIn(['unpaid', 'paid', 'expired', '0', '1', '2']).withMessage('status must be unpaid, paid, expired, or 0, 1, 2'),
   ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -236,8 +241,9 @@ function InitTenantRouter(TenantUseCase, TenantPaymentLogUsecase) {
       const result = await TenantPaymentLogUsecase.getPaymentLogsByTenantId(req.params.id, {
         limit: req.query.limit || 10,
         offset: req.query.offset || 0,
-        orderBy: req.query.orderBy || 'created_at',
-        order: req.query.order || 'DESC',
+        orderBy: req.query.orderBy || 'payment_deadline',
+        order: req.query.order || 'ASC',
+        status: req.query.status, // Filter by status (unpaid, paid, expired, or 0, 1, 2)
       }, {
         userId: req.auth.userId,
         log: req.log
@@ -252,6 +258,52 @@ function InitTenantRouter(TenantUseCase, TenantPaymentLogUsecase) {
       req.log?.error({ tenant_id: req.params.id }, `TenantRouter.getPaymentLogs_error: ${err.message}`);
       if (err.message === 'Tenant not found') {
         res.status(404).json(createResponse(null, "Tenant not found", 404));
+      } else {
+        res.status(500).json(createResponse(null, "internal server error", 500));
+      }
+    }
+  });
+
+  router.put('/:id/payments/:paymentId', [
+    param('id').isUUID().withMessage('Tenant ID must be a valid UUID'),
+    param('paymentId').isInt({ min: 1 }).withMessage('Payment ID must be a valid integer'),
+    body('payment_method').optional().isIn(['cash', 'bank_transfer', 'qris', 'other']).withMessage('payment_method must be one of: cash, bank_transfer, qris, other'),
+    body('payment_date').optional().isISO8601().withMessage('payment_date must be a valid date'),
+    body('notes').optional().isString(),
+  ], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json(createResponse(null, "bad request", 400, false, {}, errors));
+    }
+    
+    try {
+      req.log?.info({ 
+        tenant_id: req.params.id, 
+        payment_id: req.params.paymentId, 
+        body: req.body 
+      }, "TenantRouter.updatePaymentLog");
+      
+      const updatedPaymentLog = await TenantPaymentLogUsecase.updatePaymentLog(
+        req.params.paymentId,
+        {
+          ...req.body,
+          status: 'paid', // Automatically set status to paid when updating payment
+        },
+        {
+          userId: req.auth.userId,
+          log: req.log
+        }
+      );
+
+      res.status(200).json(createResponse(updatedPaymentLog, "Payment log updated successfully", 200));
+    } catch (err) {
+      req.log?.error({ 
+        tenant_id: req.params.id, 
+        payment_id: req.params.paymentId 
+      }, `TenantRouter.updatePaymentLog_error: ${err.message}`);
+      
+      if (err.message === 'Payment log not found') {
+        res.status(404).json(createResponse(null, "Payment log not found", 404));
       } else {
         res.status(500).json(createResponse(null, "internal server error", 500));
       }

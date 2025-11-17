@@ -19,7 +19,8 @@ class TenantUseCase {
     unitRepository,
     tenantLogRepository,
     depositoLogRepository,
-    userUsecase
+    userUsecase,
+    tenantPaymentLogRepository
   ) {
     this.tenantRepository = tenantRepository;
     this.tenantAttachmentRepository = tenantAttachmentRepository;
@@ -30,6 +31,7 @@ class TenantUseCase {
     this.tenantLogRepository = tenantLogRepository;
     this.depositoLogRepository = depositoLogRepository;
     this.userUsecase = userUsecase;
+    this.tenantPaymentLogRepository = tenantPaymentLogRepository;
   }
 
   async createTenant(data, ctx) {
@@ -70,7 +72,35 @@ class TenantUseCase {
           console.error("data.new_user:", data.new_user);
           throw new Error('user_id is required for creating tenant');
         }
-        console.log("user_id: " + data.user_id);
+        
+        // Frontend sends: 0 = year, 1 = month (matches DurationUnit constant)
+        // DurationUnit constant: year = 0, month = 1
+        let rentDurationUnitInt;
+        if (typeof data.rent_duration_unit === 'number') {
+          // Frontend sends: 0 = year, 1 = month (same as DurationUnit)
+          if (data.rent_duration_unit !== 0 && data.rent_duration_unit !== 1) {
+            throw new Error('rent_duration_unit must be 0 (year) or 1 (month)');
+          }
+          // Use value directly since frontend format matches DurationUnit
+          rentDurationUnitInt = data.rent_duration_unit;
+        } else if (typeof data.rent_duration_unit === 'string') {
+          // String format (for backward compatibility)
+          if (data.rent_duration_unit !== 'year' && data.rent_duration_unit !== 'month') {
+            throw new Error('rent_duration_unit must be either "year" or "month"');
+          }
+          rentDurationUnitInt = DurationUnit[data.rent_duration_unit];
+        } else {
+          throw new Error('rent_duration_unit is required and must be 0 (year) or 1 (month)');
+        }
+        
+        ctx.log?.info({ 
+          frontend_value: data.rent_duration_unit,
+          stored_value: rentDurationUnitInt 
+        }, "TenantUsecase.createTenant - rent_duration_unit");
+        
+        // Convert integer to string for calculateDueDate function
+        const rentDurationUnitStr = DurationUnitStr[rentDurationUnitInt];
+        
         const createTenantData = {
           user_id: data.user_id,
           name: data.name,
@@ -78,12 +108,13 @@ class TenantUseCase {
           contract_end_at: this.calculateDueDate(
             data.contract_begin_at,
             data.rent_duration,
-            data.rent_duration_unit
+            rentDurationUnitStr
           ),
           code: this.generateCode(),
           created_by: data.createdBy,
           rent_duration: data.rent_duration,
-          rent_duration_unit: DurationUnit[data.rent_duration_unit],
+          rent_duration_unit: rentDurationUnitInt,
+          payment_term: data.payment_term !== undefined ? data.payment_term : null,
           rent_price: data.rent_price || null,
           down_payment: data.down_payment || null,
           deposit: data.deposit || null,
@@ -143,6 +174,94 @@ class TenantUseCase {
             created_by: ctx.userId,
           };
           await this.depositoLogRepository.create(depositoLog, { ...ctx, transaction: t }, t);
+        }
+        
+        // Create payment logs if payment_term is provided
+        // payment_term: 0 = year, 1 = month
+        // Note: payment_term can be 0 (falsy), so we check explicitly for undefined/null
+        const hasPaymentTerm = data.payment_term !== undefined && data.payment_term !== null;
+        ctx.log?.info({ 
+          payment_term: data.payment_term, 
+          hasPaymentTerm,
+          payment_term_type: typeof data.payment_term,
+          hasRepository: !!this.tenantPaymentLogRepository 
+        }, "TenantUsecase.createTenant - checking payment log creation");
+        
+        if (hasPaymentTerm && this.tenantPaymentLogRepository) {
+          // Normalize payment_term to number (handle string "0" or "1")
+          const paymentTerm = typeof data.payment_term === 'string' ? parseInt(data.payment_term, 10) : data.payment_term;
+          
+          if (paymentTerm !== 0 && paymentTerm !== 1) {
+            throw new Error(`Invalid payment_term: ${data.payment_term}. Must be 0 (year) or 1 (month)`);
+          }
+          
+          ctx.log?.info({ payment_term: paymentTerm }, "TenantUsecase.createTenant - creating payment logs");
+          const contractBeginDate = moment(data.contract_begin_at).tz("Asia/Jakarta");
+          let numberOfLogs;
+          let paymentAmount;
+          let dateUnit; // 'years' or 'months'
+          
+          if (paymentTerm === 0) {
+            // Payment term is in years
+            // Convert rent_duration to years if needed
+            // rent_duration_unit is now an integer (0 = year, 1 = month)
+            let rentDurationInYears;
+            if (rentDurationUnitInt === DurationUnit.year || rentDurationUnitInt === 0) {
+              rentDurationInYears = data.rent_duration; // Already in years
+            } else {
+              rentDurationInYears = Math.floor(data.rent_duration / 12); // Convert months to years
+            }
+            
+            numberOfLogs = rentDurationInYears; // 1 payment per year
+            paymentAmount = tenant.rent_price - tenant.down_payment / numberOfLogs;
+            dateUnit = 'years';
+          } else if (paymentTerm === 1) {
+            // Payment term is in months
+            // Convert rent_duration to months if needed
+            // rent_duration_unit is now an integer (0 = year, 1 = month)
+            let rentDurationInMonths;
+            if (rentDurationUnitInt === DurationUnit.year || rentDurationUnitInt === 0) {
+              rentDurationInMonths = data.rent_duration * 12;
+            } else {
+              rentDurationInMonths = data.rent_duration;
+            }
+            
+            numberOfLogs = rentDurationInMonths; // 1 payment per month
+            paymentAmount = (tenant.rent_price - tenant.down_payment) / numberOfLogs;
+            dateUnit = 'months';
+          } else {
+            // Invalid payment_term value
+            throw new Error('payment_term must be 0 (year) or 1 (month)');
+          }
+          
+          ctx.log?.info({ 
+            numberOfLogs, 
+            paymentAmount, 
+            dateUnit,
+            rentDurationUnitInt 
+          }, "TenantUsecase.createTenant - payment log calculation");
+          
+          if (numberOfLogs > 0) {
+            ctx.log?.info({ numberOfLogs }, "TenantUsecase.createTenant - creating payment logs");
+            // Create payment logs
+            for (let i = 0; i < numberOfLogs; i++) {
+              const paymentDeadline = moment(contractBeginDate).add(i, dateUnit);
+              
+              const paymentLogData = {
+                tenant_id: tenant.id,
+                amount: paymentAmount,
+                payment_date: null,
+                payment_deadline: paymentDeadline.toDate(),
+                payment_method: 'other', // Default payment method, can be updated later
+                status: 0, // Default status: 0 = unpaid
+                notes: `Payment ${i + 1} of ${numberOfLogs}`,
+                created_by: ctx.userId,
+                updated_by: ctx.userId,
+              };
+              
+              await this.tenantPaymentLogRepository.create(paymentLogData, { ...ctx, transaction: t }, t);
+            }
+          }
         }
         
         return this.tenantToJson(tenant);
@@ -261,6 +380,11 @@ class TenantUseCase {
       }
 
       tenant.status = TenantStatusIntToStr[tenant.status];
+      
+      // Convert rent_duration_unit to string: 0 = year, 1 = month
+      if (tenant.rent_duration_unit !== undefined && tenant.rent_duration_unit !== null) {
+        tenant.rent_duration_unit = DurationUnitStr[tenant.rent_duration_unit] || tenant.rent_duration_unit;
+      }
 
       return tenant;
     } catch (error) {
@@ -315,6 +439,11 @@ class TenantUseCase {
 
           // Convert status to string
           tenant.status = TenantStatusIntToStr[tenant.status];
+          
+          // Convert rent_duration_unit to string: 0 = year, 1 = month
+          if (tenant.rent_duration_unit !== undefined && tenant.rent_duration_unit !== null) {
+            tenant.rent_duration_unit = DurationUnitStr[tenant.rent_duration_unit] || tenant.rent_duration_unit;
+          }
 
           return tenant;
         })

@@ -12,8 +12,10 @@ class TenantPaymentLogRepository {
       const paymentLog = await this.tenantPaymentLogModel.create({
         tenant_id: data.tenant_id,
         amount: data.amount,
-        payment_date: data.payment_date,
+        payment_date: data.payment_date || null, // Can be null, will be filled when payment is made
+        payment_deadline: data.payment_deadline, // Payment deadline (required)
         payment_method: data.payment_method,
+        status: data.status !== undefined ? data.status : 0, // Default to 0 (unpaid) if not provided
         notes: data.notes || null,
         created_by: data.created_by || ctx.userId || null,
         updated_by: data.updated_by || ctx.userId || null,
@@ -60,10 +62,31 @@ class TenantPaymentLogRepository {
   async findByTenantId(tenantId, queryParams = {}, ctx = {}) {
     try {
       ctx.log?.info({ tenantId, queryParams }, 'TenantPaymentLogRepository.findByTenantId');
-      const { limit = 10, offset = 0, orderBy = 'created_at', order = 'DESC' } = queryParams;
+      const { limit = 10, offset = 0, orderBy = 'payment_deadline', order = 'ASC', status } = queryParams;
+      
+      // Build where clause
+      const whereClause = { tenant_id: tenantId };
+      
+      // Add status filter if provided
+      if (status !== undefined && status !== null && status !== '') {
+        // Convert string status to integer if needed
+        let statusInt = status;
+        if (typeof status === 'string') {
+          const { PaymentLogStatusStrToInt } = require('../models/TenantPaymentLog');
+          statusInt = PaymentLogStatusStrToInt[status];
+          if (statusInt === undefined) {
+            // If string doesn't match, try parsing as integer
+            statusInt = parseInt(status, 10);
+            if (isNaN(statusInt)) {
+              throw new Error(`Invalid status: ${status}. Must be 'unpaid', 'paid', 'expired', or 0, 1, 2`);
+            }
+          }
+        }
+        whereClause.status = statusInt;
+      }
       
       const { rows, count } = await this.tenantPaymentLogModel.findAndCountAll({
-        where: { tenant_id: tenantId },
+        where: whereClause,
         limit: parseInt(limit),
         offset: parseInt(offset),
         order: [[orderBy, order]],

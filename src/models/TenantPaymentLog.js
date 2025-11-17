@@ -1,6 +1,18 @@
 const { DataTypes, Model } = require('sequelize');
 const sequelize = require('./sequelize');
 
+const PaymentLogStatusStrToInt = {
+  'unpaid': 0,
+  'paid': 1,
+  'expired': 2
+};
+
+const PaymentLogStatusIntToStr = {
+  0: 'unpaid',
+  1: 'paid',
+  2: 'expired'
+};
+
 class TenantPaymentLog extends Model {}
 
 TenantPaymentLog.init({
@@ -19,11 +31,23 @@ TenantPaymentLog.init({
   },
   payment_date: {
     type: DataTypes.DATE,
+    allowNull: true,
+    comment: 'Payment date - will be filled when payment is made'
+  },
+  payment_deadline: {
+    type: DataTypes.DATE,
     allowNull: false,
+    comment: 'Payment deadline date for this payment'
   },
   payment_method: {
     type: DataTypes.ENUM('cash', 'bank_transfer', 'qris', 'other'),
     allowNull: false,
+  },
+  status: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0, // 0 = unpaid
+    comment: 'Status: 0=unpaid, 1=paid, 2=expired'
   },
   notes: {
     type: DataTypes.TEXT,
@@ -53,7 +77,9 @@ TenantPaymentLog.init({
   indexes: [
     { fields: ['tenant_id'] },
     { fields: ['payment_date'] },
+    { fields: ['payment_deadline'] },
     { fields: ['created_at'] },
+    { fields: ['status'] },
   ],
 });
 
@@ -72,5 +98,5 @@ TenantPaymentLog.associate = (models) => {
   });
 };
 
-module.exports = TenantPaymentLog;
+module.exports = { TenantPaymentLog, PaymentLogStatusStrToInt, PaymentLogStatusIntToStr };
 

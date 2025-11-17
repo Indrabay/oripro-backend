@@ -1,4 +1,5 @@
 const sequelize = require("../models/sequelize");
+const { PaymentLogStatusIntToStr } = require("../models/TenantPaymentLog");
 
 class TenantPaymentLogUsecase {
   constructor(tenantPaymentLogRepository, tenantRepository) {
@@ -17,10 +18,12 @@ class TenantPaymentLogUsecase {
       }
 
       // Create payment log
+      // payment_date can be null initially, will be filled when payment is made
       const paymentLog = await this.tenantPaymentLogRepository.create({
         tenant_id: data.tenant_id,
         amount: data.amount,
-        payment_date: data.payment_date || new Date(),
+        payment_date: null, // Can be null, will be filled when payment is made
+        payment_deadline: data.payment_deadline, // Payment deadline (required)
         payment_method: data.payment_method,
         notes: data.notes,
         created_by: ctx.userId,
@@ -47,11 +50,26 @@ class TenantPaymentLogUsecase {
         throw new Error('Payment log not found');
       }
 
+      // Convert status from string to integer if provided
+      const updateData = { ...data };
+      if (updateData.status && typeof updateData.status === 'string') {
+        const { PaymentLogStatusStrToInt } = require("../models/TenantPaymentLog");
+        updateData.status = PaymentLogStatusStrToInt[updateData.status];
+        if (updateData.status === undefined) {
+          throw new Error(`Invalid status: ${data.status}. Must be 'unpaid', 'paid', or 'expired'`);
+        }
+      }
+
       // Update payment log
       const updatedPaymentLog = await this.tenantPaymentLogRepository.update(id, {
-        ...data,
+        ...updateData,
         updated_by: ctx.userId,
       }, ctx);
+      
+      // Convert status back to string for response
+      if (updatedPaymentLog && updatedPaymentLog.status !== undefined) {
+        updatedPaymentLog.status = PaymentLogStatusIntToStr[updatedPaymentLog.status] || updatedPaymentLog.status;
+      }
 
       return updatedPaymentLog;
     } catch (error) {

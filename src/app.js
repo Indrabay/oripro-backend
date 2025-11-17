@@ -107,7 +107,7 @@ const modelTaskGroup = require('./models/TaskGroup');
 const modelTaskParent = require('./models/TaskParent');
 const modelUserTask = require('./models/UserTask');
 const modelUserTaskEvidence = require('./models/UserTaskEvidence');
-const modelTenantPaymentLog = require('./models/TenantPaymentLog');
+const { TenantPaymentLog: modelTenantPaymentLog } = require('./models/TenantPaymentLog');
 
 // initialize repository
 const userRepository = new UserRepository(User, modelRole);
@@ -200,7 +200,7 @@ const authUsecase = new authUc(
 );
 const userUsecase = new userUc(userRepository, userLogRepository, userAssetRepository);
 const unitUsecase = new unitUc(unitRepository, unitAttachmentRepository, unitLogRepository);
-const tenantUsecase = new tenantUc(tenantRepository, tenantAttachmentRepository, tenantUnitRepository, mapTenantCategoryRepository, tenantCategoryRepository, unitRepository, tenantLogRepository, depositoLogRepository, userUsecase);
+const tenantUsecase = new tenantUc(tenantRepository, tenantAttachmentRepository, tenantUnitRepository, mapTenantCategoryRepository, tenantCategoryRepository, unitRepository, tenantLogRepository, depositoLogRepository, userUsecase, tenantPaymentLogRepository);
 const roleUsecase = new roleUc(roleRepository);
 const menuUsecase = new menuUc(menuRepository);
 const userAccessMenuUsecase = new userAccessMenuUc(userAccessMenuRepository);
@@ -232,7 +232,7 @@ const userTaskRouter = require('./routes/userTasks').InitUserTaskRouter(userTask
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3002', 'https://oripro-frontend-62c6vs70u-ibes-projects-97d001d5.vercel.app'],
+  origin: ['http://localhost:3000', 'http://localhost:3002', 'https://oripro-frontend-eight.vercel.app'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
