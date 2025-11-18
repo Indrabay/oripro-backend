@@ -93,7 +93,13 @@ class UnitRepository {
   async findAll(filter = {}, ctx) {
     ctx.log?.info({}, "UnitRepository.findAll");
     let whereQuery = {};
-    if (filter.asset_id || filter.name || filter.is_toilet_exist || filter.status) {
+    
+    // Always filter out deleted units unless explicitly requested
+    if (filter.is_deleted === undefined) {
+      filter.is_deleted = false;
+    }
+    
+    if (filter.asset_id || filter.name || filter.is_toilet_exist || filter.status || filter.is_deleted !== undefined) {
       whereQuery.where = {};
       if (filter.asset_id) {
         whereQuery.where.asset_id = filter.asset_id;
@@ -106,8 +112,12 @@ class UnitRepository {
         };
       }
 
-      if (filter.is_toilet_exist) {
+      if (filter.is_toilet_exist !== undefined) {
         whereQuery.where.is_toilet_exist = filter.is_toilet_exist;
+      }
+
+      if (filter.is_deleted !== undefined) {
+        whereQuery.where.is_deleted = filter.is_deleted;
       }
 
       // Add status filter if provided

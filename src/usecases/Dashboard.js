@@ -31,20 +31,35 @@ class DashboardUsecase {
 
       // Get total assets count
       const allAssets = await this.assetRepository.listAll({}, ctx);
-      const totalAssets = allAssets.total || 0;
+      const totalAssets = allAssets?.total ?? (allAssets?.assets?.length ?? 0);
+      ctx.log?.info({ 
+        totalAssets, 
+        assetsCount: allAssets?.assets?.length, 
+        assetsResponse: JSON.stringify(allAssets) 
+      }, 'DashboardUsecase.getDashboardStats - Assets');
 
-      // Get total units count (not deleted)
+      // Get total units count (not deleted) - filter is_deleted is handled in repository
       const allUnits = await this.unitRepository.findAll({}, ctx);
-      const totalUnits = allUnits.total || 0;
+      const totalUnits = allUnits?.total ?? (allUnits?.units?.length ?? 0);
+      ctx.log?.info({ 
+        totalUnits, 
+        unitsCount: allUnits?.units?.length, 
+        unitsResponse: JSON.stringify(allUnits) 
+      }, 'DashboardUsecase.getDashboardStats - Units');
 
       // Get total tenants count
       const allTenants = await this.tenantRepository.findAll({}, ctx);
-      const totalTenants = allTenants.total || 0;
+      const totalTenants = allTenants?.total ?? (allTenants?.tenants?.length ?? 0);
+      ctx.log?.info({ 
+        totalTenants, 
+        tenantsCount: allTenants?.tenants?.length, 
+        tenantsResponse: JSON.stringify(allTenants) 
+      }, 'DashboardUsecase.getDashboardStats - Tenants');
 
       // Calculate total revenue from active tenants
       // Revenue = sum of rent_price from active tenants
       let totalRevenue = 0;
-      if (allTenants.tenants && allTenants.tenants.length > 0) {
+      if (allTenants?.tenants && allTenants.tenants.length > 0) {
         totalRevenue = allTenants.tenants
           .filter(tenant => tenant.status === 1) // active status
           .reduce((sum, tenant) => {
@@ -52,6 +67,7 @@ class DashboardUsecase {
             return sum + rentPrice;
           }, 0);
       }
+      ctx.log?.info({ totalRevenue }, 'DashboardUsecase.getDashboardStats - Revenue');
 
       // Calculate percentage change (simplified - comparing with previous period)
       // For now, we'll use placeholder values
@@ -407,6 +423,179 @@ class DashboardUsecase {
       ctx.log?.error(
         { error: error.message, stack: error.stack },
         'DashboardUsecase.getDashboardData_error'
+      );
+      throw error;
+    }
+  }
+
+  async getTopAssetRevenue(ctx) {
+    try {
+      ctx.log?.info({}, 'DashboardUsecase.getTopAssetRevenue');
+
+      // Get all active tenants
+      const allTenants = await this.tenantRepository.findAll({ status: 1 }, ctx);
+      
+      // Map to calculate revenue per asset
+      const assetRevenueMap = new Map();
+      const assetNameMap = new Map();
+
+      if (allTenants?.tenants && allTenants.tenants.length > 0) {
+        // Get all tenant units in batch
+        const tenantIds = allTenants.tenants.map(t => t.id);
+        const allTenantUnits = await Promise.all(
+          tenantIds.map(id => this.tenantUnitRepository.getByTenantID(id))
+        );
+
+        // Get all unit IDs
+        const unitIds = [];
+        allTenantUnits.forEach(tenantUnits => {
+          if (tenantUnits && tenantUnits.length > 0) {
+            tenantUnits.forEach(tu => {
+              // Handle Sequelize model instances
+              const unitId = tu.unit_id || tu.get?.('unit_id') || tu.toJSON?.()?.unit_id;
+              if (unitId && !unitIds.includes(unitId)) {
+                unitIds.push(unitId);
+              }
+            });
+          }
+        });
+
+        // Get all units in batch
+        const allUnits = await Promise.all(
+          unitIds.map(id => this.unitRepository.findById(id))
+        );
+
+        // Create unit map
+        const unitMap = new Map();
+        allUnits.forEach(unit => {
+          if (unit && unit.id) {
+            unitMap.set(unit.id, unit);
+          }
+        });
+
+        // Get all asset IDs
+        const assetIds = new Set();
+        allUnits.forEach(unit => {
+          if (unit && unit.asset_id) {
+            assetIds.add(unit.asset_id);
+          }
+        });
+
+        // Get all assets in batch
+        const allAssets = await Promise.all(
+          Array.from(assetIds).map(id => this.assetRepository.findById(id, ctx))
+        );
+
+        // Create asset name map
+        allAssets.forEach(asset => {
+          if (asset && asset.id) {
+            assetNameMap.set(asset.id, asset.name);
+          }
+        });
+
+        // Calculate revenue per asset
+        allTenants.tenants.forEach((tenant, tenantIndex) => {
+          if (!tenant || tenant.status !== 1) return;
+          
+          const rentPrice = tenant.rent_price || 0;
+          const tenantUnits = allTenantUnits[tenantIndex];
+          
+          if (tenantUnits && tenantUnits.length > 0) {
+            tenantUnits.forEach(tenantUnit => {
+              // Handle Sequelize model instances
+              const unitId = tenantUnit.unit_id || tenantUnit.get?.('unit_id') || tenantUnit.toJSON?.()?.unit_id;
+              const unit = unitMap.get(unitId);
+              if (unit && unit.asset_id) {
+                const assetId = unit.asset_id;
+                const currentRevenue = assetRevenueMap.get(assetId) || 0;
+                // Use unit rent_price if available, otherwise distribute tenant rent_price equally
+                const unitRevenue = unit.rent_price || (rentPrice / tenantUnits.length);
+                assetRevenueMap.set(assetId, currentRevenue + unitRevenue);
+              }
+            });
+          }
+        });
+      }
+
+      // Convert map to array and sort by revenue descending
+      const topAssets = Array.from(assetRevenueMap.entries())
+        .map(([assetId, revenue]) => ({
+          id: assetId,
+          name: assetNameMap.get(assetId) || 'Unknown Asset',
+          revenue: revenue || 0,
+        }))
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 5)
+        .map(asset => ({
+          name: asset.name,
+          revenue: asset.revenue,
+          formatted: new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+          }).format(asset.revenue),
+        }));
+
+      return topAssets;
+    } catch (error) {
+      ctx.log?.error(
+        { error: error.message, stack: error.stack },
+        'DashboardUsecase.getTopAssetRevenue_error'
+      );
+      throw error;
+    }
+  }
+
+  async getRevenueGrowth(ctx) {
+    try {
+      ctx.log?.info({}, 'DashboardUsecase.getRevenueGrowth');
+
+      // Get all tenants
+      const allTenants = await this.tenantRepository.findAll({}, ctx);
+      
+      // Initialize years from 2018 to current year + 1
+      const currentYear = new Date().getFullYear();
+      const startYear = 2018;
+      const endYear = currentYear + 1;
+      const years = [];
+      for (let year = startYear; year <= endYear; year++) {
+        years.push(year.toString());
+      }
+
+      // Initialize revenue map
+      const revenueByYear = new Map();
+      years.forEach(year => {
+        revenueByYear.set(year, 0);
+      });
+
+      // Calculate revenue per year based on contract_begin_at
+      if (allTenants?.tenants && allTenants.tenants.length > 0) {
+        for (const tenant of allTenants.tenants) {
+          if (!tenant || !tenant.contract_begin_at) continue;
+          
+          const contractBeginDate = new Date(tenant.contract_begin_at);
+          const contractYear = contractBeginDate.getFullYear().toString();
+          
+          // Only count active tenants
+          if (tenant.status === 1 && tenant.rent_price) {
+            const currentRevenue = revenueByYear.get(contractYear) || 0;
+            revenueByYear.set(contractYear, currentRevenue + (tenant.rent_price || 0));
+          }
+        }
+      }
+
+      // Convert to array format for chart
+      const revenueData = years.map(year => revenueByYear.get(year) || 0);
+
+      return {
+        years: years,
+        revenue: revenueData,
+      };
+    } catch (error) {
+      ctx.log?.error(
+        { error: error.message, stack: error.stack },
+        'DashboardUsecase.getRevenueGrowth_error'
       );
       throw error;
     }

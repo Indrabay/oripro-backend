@@ -51,6 +51,50 @@ function InitDashboardRouter(dashboardUsecase) {
     }
   });
 
+  router.get('/top-asset-revenue', async (req, res) => {
+    try {
+      req.log?.info({}, 'DashboardRouter.getTopAssetRevenue');
+      const topAssets = await dashboardUsecase.getTopAssetRevenue({
+        userId: req.auth?.userId,
+        log: req.log,
+      });
+
+      return res.status(200).json(
+        createResponse(topAssets, 'Top asset revenue retrieved successfully', 200)
+      );
+    } catch (error) {
+      req.log?.error(
+        { error: error.message, stack: error.stack },
+        'DashboardRouter.getTopAssetRevenue_error'
+      );
+      return res.status(500).json(
+        createResponse(null, 'Internal server error', 500)
+      );
+    }
+  });
+
+  router.get('/revenue-growth', async (req, res) => {
+    try {
+      req.log?.info({}, 'DashboardRouter.getRevenueGrowth');
+      const revenueGrowth = await dashboardUsecase.getRevenueGrowth({
+        userId: req.auth?.userId,
+        log: req.log,
+      });
+
+      return res.status(200).json(
+        createResponse(revenueGrowth, 'Revenue growth retrieved successfully', 200)
+      );
+    } catch (error) {
+      req.log?.error(
+        { error: error.message, stack: error.stack },
+        'DashboardRouter.getRevenueGrowth_error'
+      );
+      return res.status(500).json(
+        createResponse(null, 'Internal server error', 500)
+      );
+    }
+  });
+
   return router;
 }
 
