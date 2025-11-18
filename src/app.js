@@ -212,6 +212,17 @@ const complaintReportUsecase = new complaintReportUc(complaintReportRepository, 
 const attendanceRepository = new AttendanceRepository();
 const attendanceUsecase = new attendanceUc(attendanceRepository);
 const tenantPaymentLogUsecase = new tenantPaymentLogUc(tenantPaymentLogRepository, tenantRepository);
+const DashboardUsecase = require('./usecases/Dashboard');
+const dashboardUsecase = new DashboardUsecase(
+  complaintReportRepository,
+  tenantRepository,
+  userRepository,
+  userTaskRepository,
+  attendanceRepository,
+  tenantUnitRepository,
+  unitRepository,
+  assetRepository
+);
 
 // initalize router
 const authRouter = auth.InitAuthRouter(authUsecase);
@@ -228,6 +239,8 @@ const taskGroupRouter = InitTaskGroupRouter(taskGroupUsecase);
 const scanInfoRouter = InitScanInfoRouter(scanInfoUsecase);
 const complaintReportRouter = InitComplaintReportRouter(complaintReportUsecase);
 const userTaskRouter = require('./routes/userTasks').InitUserTaskRouter(userTaskUsecase);
+const { InitDashboardRouter } = require('./routes/dashboard');
+const dashboardRouter = InitDashboardRouter(dashboardUsecase);
 
 // Middleware
 app.use(helmet());
@@ -375,7 +388,7 @@ app.use('/api/uploads', uploadFileRouter);
 app.use('/api/scan-infos', scanInfoRouter);
 app.use('/api/user-tasks', userTaskRouter);
 app.use('/api/complaint-reports', complaintReportRouter);
-
+app.use('/api/dashboard', dashboardRouter);
 app.use('/api/attendances', attendanceRouter);
 app.get('/metrics', metricsHandler);
 

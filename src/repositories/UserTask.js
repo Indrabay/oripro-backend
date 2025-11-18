@@ -118,6 +118,57 @@ class UserTaskRepository {
     }
   }
 
+  async findAll(filters = {}, ctx = {}) {
+    try {
+      ctx.log?.info({ filters }, 'UserTaskRepository.findAll');
+      const queryOptions = {
+        include: [
+          {
+            model: this.userModel,
+            as: 'user',
+            attributes: ['id', 'name', 'email']
+          },
+          {
+            model: this.taskModel,
+            as: 'task',
+            attributes: ['id', 'name', 'duration', 'is_scan', 'scan_code'],
+            required: false
+          },
+          {
+            model: this.userTaskEvidenceModel,
+            as: 'evidences',
+            attributes: ['id', 'user_task_id', 'url', 'created_at']
+          }
+        ],
+        order: [['created_at', 'DESC']]
+      };
+
+      if (filters.limit) {
+        queryOptions.limit = parseInt(filters.limit);
+      }
+      if (filters.offset) {
+        queryOptions.offset = parseInt(filters.offset);
+      }
+
+      const { count, rows } = await this.userTaskModel.findAndCountAll(queryOptions);
+
+      return {
+        rows: rows.map(ut => {
+          const utJson = ut.toJSON();
+          // Convert status from integer to string
+          if (utJson.status !== undefined) {
+            utJson.status = UserTaskStatusIntToStr[utJson.status] || 'pending';
+          }
+          return utJson;
+        }),
+        total: count
+      };
+    } catch (error) {
+      ctx.log?.error({ filters, error: error.message }, 'UserTaskRepository.findAll_error');
+      throw error;
+    }
+  }
+
   async findByUserId(userId, queryParams = {}, ctx = {}) {
     try {
       ctx.log?.info({ userId, queryParams }, 'UserTaskRepository.findByUserId');
