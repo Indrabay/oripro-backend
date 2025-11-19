@@ -490,15 +490,31 @@ class TenantUseCase {
       
       // Check each field for changes
       Object.keys(data).forEach(key => {
-        if (data[key] !== undefined && data[key] !== oldTenant[key]) {
-          if (key === 'rent_duration_unit') {
-            // Convert integer to string for old data
-            oldData[key] = DurationUnitStr[oldTenant[key]];
-            // Convert string to string for new data (if it's string) or integer to string
-            changedFields[key] = typeof data[key] === 'string' ? data[key] : DurationUnitStr[data[key]];
+        if (data[key] !== undefined) {
+          let hasChanged = false;
+          if (key === 'status') {
+            // Compare status: convert oldTenant status (integer) to string for comparison
+            const oldStatusStr = TenantStatusIntToStr[oldTenant[key]] || String(oldTenant[key]);
+            hasChanged = data[key] !== oldStatusStr;
+            if (hasChanged) {
+              oldData[key] = oldStatusStr;
+              changedFields[key] = data[key];
+            }
+          } else if (key === 'rent_duration_unit') {
+            // Compare rent_duration_unit: convert oldTenant (integer) to string for comparison
+            const oldUnitStr = DurationUnitStr[oldTenant[key]];
+            const newUnitStr = typeof data[key] === 'string' ? data[key] : DurationUnitStr[data[key]];
+            hasChanged = newUnitStr !== oldUnitStr;
+            if (hasChanged) {
+              oldData[key] = oldUnitStr;
+              changedFields[key] = newUnitStr;
+            }
           } else {
-            oldData[key] = oldTenant[key];
-            changedFields[key] = data[key];
+            hasChanged = data[key] !== oldTenant[key];
+            if (hasChanged) {
+              oldData[key] = oldTenant[key];
+              changedFields[key] = data[key];
+            }
           }
         }
       });

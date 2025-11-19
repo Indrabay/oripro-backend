@@ -60,14 +60,26 @@ class DashboardUsecase {
       // Revenue = sum of rent_price from active tenants
       let totalRevenue = 0;
       if (allTenants?.tenants && allTenants.tenants.length > 0) {
-        totalRevenue = allTenants.tenants
-          .filter(tenant => tenant.status === 1) // active status
-          .reduce((sum, tenant) => {
-            const rentPrice = tenant.rent_price || 0;
-            return sum + rentPrice;
-          }, 0);
+        const activeTenants = allTenants.tenants.filter(tenant => {
+          // Handle Sequelize model instances
+          const tenantData = tenant.toJSON ? tenant.toJSON() : tenant;
+          return tenantData.status === 1; // active status
+        });
+        
+        totalRevenue = activeTenants.reduce((sum, tenant) => {
+          // Handle Sequelize model instances
+          const tenantData = tenant.toJSON ? tenant.toJSON() : tenant;
+          const rentPrice = parseFloat(tenantData.rent_price) || 0;
+          ctx.log?.info({ 
+            tenantId: tenantData.id, 
+            tenantName: tenantData.name, 
+            rentPrice,
+            rentPriceType: typeof tenantData.rent_price 
+          }, 'DashboardUsecase.getDashboardStats - Tenant Revenue');
+          return sum + rentPrice;
+        }, 0);
       }
-      ctx.log?.info({ totalRevenue }, 'DashboardUsecase.getDashboardStats - Revenue');
+      ctx.log?.info({ totalRevenue, tenantCount: allTenants?.tenants?.length || 0 }, 'DashboardUsecase.getDashboardStats - Revenue');
 
       // Calculate percentage change (simplified - comparing with previous period)
       // For now, we'll use placeholder values
@@ -432,13 +444,18 @@ class DashboardUsecase {
     try {
       ctx.log?.info({}, 'DashboardUsecase.getTopAssetRevenue');
 
-      // Get all active tenants
+      // Get all active tenants (status = 1 means active)
       const allTenants = await this.tenantRepository.findAll({ status: 1 }, ctx);
+      
+      ctx.log?.info({ 
+        totalTenants: allTenants?.tenants?.length || 0,
+        tenants: allTenants?.tenants?.map(t => ({ id: t.id, name: t.name, status: t.status, rent_price: t.rent_price })) || []
+      }, 'DashboardUsecase.getTopAssetRevenue - Fetched Tenants');
       
       // Map to calculate revenue per asset
       const assetRevenueMap = new Map();
       const assetNameMap = new Map();
-
+      
       if (allTenants?.tenants && allTenants.tenants.length > 0) {
         // Get all tenant units in batch
         const tenantIds = allTenants.tenants.map(t => t.id);
@@ -459,12 +476,11 @@ class DashboardUsecase {
             });
           }
         });
-
+      
         // Get all units in batch
         const allUnits = await Promise.all(
           unitIds.map(id => this.unitRepository.findById(id))
         );
-
         // Create unit map
         const unitMap = new Map();
         allUnits.forEach(unit => {
@@ -476,11 +492,10 @@ class DashboardUsecase {
         // Get all asset IDs
         const assetIds = new Set();
         allUnits.forEach(unit => {
-          if (unit && unit.asset_id) {
-            assetIds.add(unit.asset_id);
+          if (unit && unit.asset?.id) {
+            assetIds.add(unit.asset?.id);
           }
         });
-
         // Get all assets in batch
         const allAssets = await Promise.all(
           Array.from(assetIds).map(id => this.assetRepository.findById(id, ctx))
@@ -495,22 +510,48 @@ class DashboardUsecase {
 
         // Calculate revenue per asset
         allTenants.tenants.forEach((tenant, tenantIndex) => {
-          if (!tenant || tenant.status !== 1) return;
+          // Handle Sequelize model instances
+          const tenantData = tenant.toJSON ? tenant.toJSON() : tenant;
           
-          const rentPrice = tenant.rent_price || 0;
+          // Status should already be filtered to 1, but double-check
+          if (!tenantData) {
+            ctx.log?.warn({ tenantIndex }, 'DashboardUsecase.getTopAssetRevenue - Skipping invalid tenant');
+            return;
+          }
+          
+          // Always use tenant rent_price as revenue source
+          const rentPrice = parseFloat(tenantData.rent_price) || 0;
           const tenantUnits = allTenantUnits[tenantIndex];
           
-          if (tenantUnits && tenantUnits.length > 0) {
+          ctx.log?.info({ 
+            tenantId: tenantData.id,
+            tenantName: tenantData.name,
+            status: tenantData.status,
+            rentPrice,
+            tenantUnitsCount: tenantUnits?.length || 0
+          }, 'DashboardUsecase.getTopAssetRevenue - Processing Tenant');
+          
+          // Only process if tenant has units and rent_price > 0
+          if (tenantUnits && tenantUnits.length > 0 && rentPrice > 0) {
+            // Distribute tenant rent_price equally among all units
+            const revenuePerUnit = rentPrice / tenantUnits.length;
+            
             tenantUnits.forEach(tenantUnit => {
               // Handle Sequelize model instances
               const unitId = tenantUnit.unit_id || tenantUnit.get?.('unit_id') || tenantUnit.toJSON?.()?.unit_id;
               const unit = unitMap.get(unitId);
-              if (unit && unit.asset_id) {
-                const assetId = unit.asset_id;
+              if (unit && unit.asset?.id) {
+                const assetId = unit.asset?.id;
                 const currentRevenue = assetRevenueMap.get(assetId) || 0;
-                // Use unit rent_price if available, otherwise distribute tenant rent_price equally
-                const unitRevenue = unit.rent_price || (rentPrice / tenantUnits.length);
-                assetRevenueMap.set(assetId, currentRevenue + unitRevenue);
+                // Always use tenant rent_price divided by number of units
+                assetRevenueMap.set(assetId, currentRevenue + revenuePerUnit);
+                ctx.log?.info({ 
+                  assetId, 
+                  unitId,
+                  revenuePerUnit,
+                  currentRevenue,
+                  newRevenue: currentRevenue + revenuePerUnit
+                }, 'DashboardUsecase.getTopAssetRevenue - Adding Revenue');
               }
             });
           }
@@ -518,26 +559,39 @@ class DashboardUsecase {
       }
 
       // Convert map to array and sort by revenue descending
-      const topAssets = Array.from(assetRevenueMap.entries())
-        .map(([assetId, revenue]) => ({
-          id: assetId,
-          name: assetNameMap.get(assetId) || 'Unknown Asset',
-          revenue: revenue || 0,
-        }))
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, 5)
-        .map(asset => ({
-          name: asset.name,
-          revenue: asset.revenue,
-          formatted: new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-          }).format(asset.revenue),
-        }));
+      let topAssets = [];
+      if (assetRevenueMap.size > 0) {
+        topAssets = Array.from(assetRevenueMap.entries())
+          .map(([assetId, revenue]) => {
+            const revenueValue = parseFloat(revenue) || 0;
+            return {
+              id: assetId,
+              name: assetNameMap.get(assetId) || 'Unknown Asset',
+              revenue: revenueValue,
+            };
+          })
+          .sort((a, b) => b.revenue - a.revenue)
+          .slice(0, 5)
+          .map(asset => ({
+            name: asset.name,
+            revenue: asset.revenue,
+            formatted: new Intl.NumberFormat('id-ID', {
+              style: 'currency',
+              currency: 'IDR',
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0,
+            }).format(asset.revenue),
+          }));
+      }
 
-      return topAssets;
+      ctx.log?.info({ 
+        topAssetsCount: topAssets.length,
+        assetRevenueMapSize: assetRevenueMap.size,
+        topAssets: topAssets.map(a => ({ name: a.name, revenue: a.revenue }))
+      }, 'DashboardUsecase.getTopAssetRevenue - Result');
+
+      // Always return an array, even if empty
+      return Array.isArray(topAssets) ? topAssets : [];
     } catch (error) {
       ctx.log?.error(
         { error: error.message, stack: error.stack },

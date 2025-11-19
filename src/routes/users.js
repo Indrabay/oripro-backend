@@ -10,12 +10,12 @@ function InitUserRouter(userUsecase, userAccessMenuUsecase) {
     req.log?.info({}, "UserRouter.getUsers");
     if (!req.query.limit) {
       req.query.limit = "10"
-      limit = 10
     }
     if (!req.query.offset) {
       req.query.offset = "0"
-      offset = 0
     }
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const offset = parseInt(req.query.offset, 10) || 0;
     try {
       const users = await userUsecase.listUsers(req.query, {
         requestId: req.requestId,

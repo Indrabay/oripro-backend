@@ -58,7 +58,7 @@ function InitDashboardRouter(dashboardUsecase) {
         userId: req.auth?.userId,
         log: req.log,
       });
-
+      console.log('Top Assets:', topAssets);
       return res.status(200).json(
         createResponse(topAssets, 'Top asset revenue retrieved successfully', 200)
       );

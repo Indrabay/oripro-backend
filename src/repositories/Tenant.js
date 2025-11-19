@@ -134,8 +134,28 @@ class TenantRepository {
       updateData.rent_duration_unit = DurationUnit[updateData.rent_duration_unit];
     }
     
+    // Convert status from string to integer if needed
+    if (updateData.status !== undefined && updateData.status !== null) {
+      if (typeof updateData.status === 'string') {
+        const { TenantStatusStrToInt } = require('../models/Tenant');
+        updateData.status = TenantStatusStrToInt[updateData.status];
+        if (updateData.status === undefined) {
+          throw new Error(`Invalid status: ${data.status}. Must be 'inactive', 'active', 'pending', 'expired', 'terminated', or 'blacklisted'`);
+        }
+      }
+      // If status is already an integer, use it directly
+    }
+    
     await tenant.update(updateData);
-    return tenant;
+    
+    // Convert status back to string for response
+    const tenantJson = tenant.toJSON();
+    if (tenantJson.status !== undefined && tenantJson.status !== null) {
+      const { TenantStatusIntToStr } = require('../models/Tenant');
+      tenantJson.status = TenantStatusIntToStr[tenantJson.status] || tenantJson.status;
+    }
+    
+    return tenantJson;
   }
 
   async delete(id, ctx) {
