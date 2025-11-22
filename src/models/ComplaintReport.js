@@ -131,6 +131,10 @@ ComplaintReport.associate = (models) => {
     foreignKey: 'updated_by',
     as: 'updatedBy',
   });
+  ComplaintReport.hasMany(models.ComplaintReportEvidence, {
+    foreignKey: 'complaint_report_id',
+    as: 'evidences',
+  });
 };
 
 module.exports = {

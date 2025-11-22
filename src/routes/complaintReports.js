@@ -12,8 +12,25 @@ function InitComplaintReportRouter(complaintReportUsecase) {
     body('title').isString().notEmpty().withMessage('title is required'),
     body('description').isString().notEmpty().withMessage('description is required'),
     body('reporter_id').isUUID().notEmpty().withMessage('reporter_id must be a valid UUID'),
-    body('status').optional().isIn(['pending', 'in_progress', 'resolved', 'closed']).withMessage('status must be one of: pending, in_progress, resolved, closed'),
-    body('priority').optional().isIn(['low', 'medium', 'high', 'urgent']).withMessage('priority must be one of: low, medium, high, urgent'),
+    body('status').optional().custom((value) => {
+      // Accept string status values or integer status values (0-3)
+      if (typeof value === 'string') {
+        return ['pending', 'in_progress', 'resolved', 'closed'].includes(value);
+      } else if (typeof value === 'number') {
+        return value >= 0 && value <= 3;
+      }
+      return false;
+    }).withMessage('status must be one of: pending, in_progress, resolved, closed (or 0-3)'),
+    body('priority').optional().custom((value) => {
+      // Accept string priority values or integer priority values (0-3)
+      if (typeof value === 'string') {
+        return ['low', 'medium', 'high', 'urgent'].includes(value);
+      } else if (typeof value === 'number') {
+        return value >= 0 && value <= 3;
+      }
+      return false;
+    }).withMessage('priority must be one of: low, medium, high, urgent (or 0-3)'),
+    body('evidences').optional().isArray().withMessage('evidences must be an array'),
   ];
 
   async function createComplaintReport(req, res) {
@@ -66,8 +83,26 @@ function InitComplaintReportRouter(complaintReportUsecase) {
 
   const getAllComplaintReportsParam = [
     query('type').optional().isIn(['complaint', 'report']).withMessage('type must be complaint or report'),
-    query('status').optional().isIn(['pending', 'in_progress', 'resolved', 'closed']).withMessage('status must be one of: pending, in_progress, resolved, closed'),
-    query('priority').optional().isIn(['low', 'medium', 'high', 'urgent']).withMessage('priority must be one of: low, medium, high, urgent'),
+    query('status').optional().custom((value) => {
+      // Accept string status values or integer status values (0-3)
+      if (typeof value === 'string') {
+        return ['pending', 'in_progress', 'resolved', 'closed'].includes(value);
+      } else {
+        // Query parameters come as strings, so check if it's a valid integer string
+        const numValue = parseInt(value, 10);
+        return !isNaN(numValue) && numValue >= 0 && numValue <= 3;
+      }
+    }).withMessage('status must be one of: pending, in_progress, resolved, closed (or 0-3)'),
+    query('priority').optional().custom((value) => {
+      // Accept string priority values or integer priority values (0-3)
+      if (typeof value === 'string') {
+        return ['low', 'medium', 'high', 'urgent'].includes(value);
+      } else {
+        // Query parameters come as strings, so check if it's a valid integer string
+        const numValue = parseInt(value, 10);
+        return !isNaN(numValue) && numValue >= 0 && numValue <= 3;
+      }
+    }).withMessage('priority must be one of: low, medium, high, urgent (or 0-3)'),
     query('reporter_id').optional().isUUID().withMessage('reporter_id must be a valid UUID'),
     query('tenant_id').optional().isUUID().withMessage('tenant_id must be a valid UUID'),
     query('title').optional().isString(),
@@ -120,8 +155,34 @@ function InitComplaintReportRouter(complaintReportUsecase) {
     param('id').isInt().notEmpty().withMessage('id must be an integer'),
     body('title').optional().isString().notEmpty(),
     body('description').optional().isString().notEmpty(),
-    body('status').optional().isIn(['pending', 'in_progress', 'resolved', 'closed']).withMessage('status must be one of: pending, in_progress, resolved, closed'),
-    body('priority').optional().isIn(['low', 'medium', 'high', 'urgent']).withMessage('priority must be one of: low, medium, high, urgent'),
+    body('status').optional().custom((value) => {
+      // Accept string status values or integer status values (0-3)
+      if (typeof value === 'string') {
+        return ['pending', 'in_progress', 'resolved', 'closed'].includes(value);
+      } else if (typeof value === 'number') {
+        return value >= 0 && value <= 3;
+      }
+      return false;
+    }).withMessage('status must be one of: pending, in_progress, resolved, closed (or 0-3)'),
+    body('priority').optional().custom((value) => {
+      // Accept string priority values or integer priority values (0-3)
+      if (typeof value === 'string') {
+        return ['low', 'medium', 'high', 'urgent'].includes(value);
+      } else if (typeof value === 'number') {
+        return value >= 0 && value <= 3;
+      }
+      return false;
+    }).withMessage('priority must be one of: low, medium, high, urgent (or 0-3)'),
+    body('evidences').optional().isArray().withMessage('evidences must be an array'),
+    body('evidences.*').custom((value) => {
+      // Accept either a string (URL) or an object with url property
+      if (typeof value === 'string') {
+        return value.length > 0;
+      } else if (typeof value === 'object' && value !== null) {
+        return typeof value.url === 'string' && value.url.length > 0;
+      }
+      return false;
+    }).withMessage('Each evidence must be a non-empty URL string or an object with a non-empty url property'),
   ];
 
   async function updateComplaintReport(req, res) {

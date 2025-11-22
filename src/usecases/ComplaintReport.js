@@ -8,10 +8,11 @@ const {
 } = require('../models/ComplaintReport');
 
 class ComplaintReportUsecase {
-  constructor(complaintReportRepository, userRepository, tenantRepository) {
+  constructor(complaintReportRepository, userRepository, tenantRepository, complaintReportEvidenceRepository) {
     this.complaintReportRepository = complaintReportRepository;
     this.userRepository = userRepository;
     this.tenantRepository = tenantRepository;
+    this.complaintReportEvidenceRepository = complaintReportEvidenceRepository;
   }
 
   async createComplaintReport(data, ctx) {
@@ -69,14 +70,42 @@ class ComplaintReportUsecase {
         updated_by: ctx.userId,
       };
 
-      const complaintReport = await this.complaintReportRepository.create(createData, ctx);
-      
-      // Convert status and priority back to string for response
-      const result = {
-        ...complaintReport,
-        status: ComplaintReportStatusIntToStr[complaintReport.status],
-        priority: ComplaintReportPriorityIntToStr[complaintReport.priority],
-      };
+      // Use transaction to ensure atomicity
+      const result = await sequelize.transaction(async (tx) => {
+        const transactionCtx = { ...ctx, transaction: tx };
+        
+        const complaintReport = await this.complaintReportRepository.create(createData, transactionCtx);
+        
+        // Handle evidences if provided
+        if (data.evidences && Array.isArray(data.evidences) && data.evidences.length > 0) {
+          for (const evidence of data.evidences) {
+            // Normalize evidence format: accept both string (URL) and object with url property
+            let evidenceUrl = null;
+            if (typeof evidence === 'string') {
+              evidenceUrl = evidence;
+            } else if (evidence && typeof evidence === 'object' && evidence.url) {
+              evidenceUrl = evidence.url;
+            }
+            
+            if (evidenceUrl) {
+              await this.complaintReportEvidenceRepository.create({
+                complaint_report_id: complaintReport.id,
+                url: evidenceUrl,
+              }, transactionCtx, tx);
+            }
+          }
+        }
+        
+        // Fetch the complaint report with evidences
+        const complaintReportWithEvidences = await this.complaintReportRepository.findById(complaintReport.id, transactionCtx, tx);
+        
+        // Convert status and priority back to string for response
+        return {
+          ...complaintReportWithEvidences,
+          status: ComplaintReportStatusIntToStr[complaintReportWithEvidences.status],
+          priority: ComplaintReportPriorityIntToStr[complaintReportWithEvidences.priority],
+        };
+      });
 
       return result;
     } catch (error) {
@@ -112,11 +141,29 @@ class ComplaintReportUsecase {
 
       // Convert status and priority from string to int if provided
       const queryFilters = { ...filters };
-      if (queryFilters.status && typeof queryFilters.status === 'string') {
-        queryFilters.status = ComplaintReportStatusStrToInt[queryFilters.status];
+      if (queryFilters.status !== undefined) {
+        if (typeof queryFilters.status === 'string') {
+          // Check if it's a string representation of a number
+          const statusNum = parseInt(queryFilters.status, 10);
+          if (!isNaN(statusNum)) {
+            queryFilters.status = statusNum;
+          } else {
+            queryFilters.status = ComplaintReportStatusStrToInt[queryFilters.status];
+          }
+        }
+        // If it's already a number, use it as is
       }
-      if (queryFilters.priority && typeof queryFilters.priority === 'string') {
-        queryFilters.priority = ComplaintReportPriorityStrToInt[queryFilters.priority];
+      if (queryFilters.priority !== undefined) {
+        if (typeof queryFilters.priority === 'string') {
+          // Check if it's a string representation of a number
+          const priorityNum = parseInt(queryFilters.priority, 10);
+          if (!isNaN(priorityNum)) {
+            queryFilters.priority = priorityNum;
+          } else {
+            queryFilters.priority = ComplaintReportPriorityStrToInt[queryFilters.priority];
+          }
+        }
+        // If it's already a number, use it as is
       }
 
       const result = await this.complaintReportRepository.findAll(queryFilters, ctx);
@@ -158,14 +205,54 @@ class ComplaintReportUsecase {
 
       updateData.updated_by = ctx.userId;
 
-      const updated = await this.complaintReportRepository.update(id, updateData, ctx);
+      // Use transaction to ensure atomicity
+      const result = await sequelize.transaction(async (tx) => {
+        const transactionCtx = { ...ctx, transaction: tx };
+        
+        // Extract evidences from updateData if present
+        const evidences = updateData.evidences;
+        delete updateData.evidences;
+        
+        const updated = await this.complaintReportRepository.update(id, updateData, transactionCtx);
+        
+        // Handle evidences if provided
+        if (evidences !== undefined) {
+          // Delete existing evidences
+          await this.complaintReportEvidenceRepository.deleteByComplaintReportId(id, transactionCtx, tx);
+          
+          // Create new evidences if provided
+          if (Array.isArray(evidences) && evidences.length > 0) {
+            for (const evidence of evidences) {
+              // Normalize evidence format: accept both string (URL) and object with url property
+              let evidenceUrl = null;
+              if (typeof evidence === 'string') {
+                evidenceUrl = evidence;
+              } else if (evidence && typeof evidence === 'object' && evidence.url) {
+                evidenceUrl = evidence.url;
+              }
+              
+              if (evidenceUrl) {
+                await this.complaintReportEvidenceRepository.create({
+                  complaint_report_id: id,
+                  url: evidenceUrl,
+                }, transactionCtx, tx);
+              }
+            }
+          }
+        }
+        
+        // Fetch the updated complaint report with evidences
+        const updatedWithEvidences = await this.complaintReportRepository.findById(id, transactionCtx, tx);
+        
+        // Convert status and priority back to string
+        return {
+          ...updatedWithEvidences,
+          status: ComplaintReportStatusIntToStr[updatedWithEvidences.status],
+          priority: ComplaintReportPriorityIntToStr[updatedWithEvidences.priority],
+        };
+      });
 
-      // Convert status and priority back to string
-      return {
-        ...updated,
-        status: ComplaintReportStatusIntToStr[updated.status],
-        priority: ComplaintReportPriorityIntToStr[updated.priority],
-      };
+      return result;
     } catch (error) {
       ctx.log?.error({ id, data, error: error.message }, 'ComplaintReportUsecase.updateComplaintReport_error');
       throw error;

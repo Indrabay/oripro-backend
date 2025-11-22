@@ -1,10 +1,11 @@
 const { Op } = require('sequelize');
 
 class ComplaintReportRepository {
-  constructor(complaintReportModel, userModel, tenantModel) {
+  constructor(complaintReportModel, userModel, tenantModel, complaintReportEvidenceModel) {
     this.complaintReportModel = complaintReportModel;
     this.userModel = userModel;
     this.tenantModel = tenantModel;
+    this.complaintReportEvidenceModel = complaintReportEvidenceModel;
   }
 
   async create(data, ctx = {}, tx = null) {
@@ -30,7 +31,7 @@ class ComplaintReportRepository {
     }
   }
 
-  async findById(id, ctx = {}) {
+  async findById(id, ctx = {}, tx = null) {
     try {
       ctx.log?.info({ id }, 'ComplaintReportRepository.findById');
       const complaintReport = await this.complaintReportModel.findByPk(id, {
@@ -56,7 +57,14 @@ class ComplaintReportRepository {
             as: 'updatedBy',
             attributes: ['id', 'name', 'email']
           },
-        ]
+          {
+            model: this.complaintReportEvidenceModel,
+            as: 'evidences',
+            attributes: ['id', 'url', 'created_at'],
+            required: false
+          },
+        ],
+        transaction: tx || ctx.transaction
       });
       return complaintReport ? complaintReport.toJSON() : null;
     } catch (error) {
@@ -110,6 +118,12 @@ class ComplaintReportRepository {
             as: 'createdBy',
             attributes: ['id', 'name', 'email']
           },
+          {
+            model: this.complaintReportEvidenceModel,
+            as: 'evidences',
+            attributes: ['id', 'url', 'created_at'],
+            required: false
+          },
         ],
         order: [['created_at', 'DESC']]
       };
@@ -144,7 +158,7 @@ class ComplaintReportRepository {
         where: { id },
         transaction: tx || ctx.transaction
       });
-      return await this.findById(id, ctx);
+      return await this.findById(id, ctx, tx);
     } catch (error) {
       ctx.log?.error({ id, data, error: error.message }, 'ComplaintReportRepository.update_error');
       throw error;
