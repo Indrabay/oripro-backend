@@ -123,9 +123,9 @@ class AttendanceUseCase {
     }
   }
 
-  async getUserAttendanceHistory(userId, limit = 10) {
+  async getUserAttendanceHistory(userId, limit = 10, dateFrom = null, dateTo = null) {
     try {
-      const history = await this.attendanceRepository.getUserAttendanceHistory(userId, limit);
+      const history = await this.attendanceRepository.getUserAttendanceHistory(userId, limit, dateFrom, dateTo);
       
       return {
         success: true,
@@ -141,9 +141,9 @@ class AttendanceUseCase {
     }
   }
 
-  async getAssetAttendanceHistory(assetId, limit = 10) {
+  async getAssetAttendanceHistory(assetId, limit = 10, dateFrom = null, dateTo = null) {
     try {
-      const history = await this.attendanceRepository.getAssetAttendanceHistory(assetId, limit);
+      const history = await this.attendanceRepository.getAssetAttendanceHistory(assetId, limit, dateFrom, dateTo);
       
       return {
         success: true,

@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { body, validationResult } = require('express-validator');
+const { body, validationResult, query } = require('express-validator');
 const { authMiddleware, ensureRole } = require('../middleware/auth');
 
 function InitAttendanceRouter(attendanceUsecase) {
@@ -128,8 +128,21 @@ function InitAttendanceRouter(attendanceUsecase) {
   });
 
   // Get user attendance history
-  router.get('/history', async (req, res) => {
+  router.get('/history', [
+    query('date_from').optional().isISO8601().withMessage('date_from must be a valid ISO 8601 date'),
+    query('date_to').optional().isISO8601().withMessage('date_to must be a valid ISO 8601 date'),
+    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('limit must be between 1 and 100'),
+  ], async (req, res) => {
     try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation error',
+          errors: errors.array()
+        });
+      }
+
       const user_id = req.auth?.userId;
 
       if (!user_id) {
@@ -140,9 +153,11 @@ function InitAttendanceRouter(attendanceUsecase) {
       }
 
       const limit = parseInt(req.query.limit) || 10;
+      const date_from = req.query.date_from || null;
+      const date_to = req.query.date_to || null;
 
-      req.log?.info({ user_id, limit }, 'route_get_user_history');
-      const result = await attendanceUsecase.getUserAttendanceHistory(user_id, limit);
+      req.log?.info({ user_id, limit, date_from, date_to }, 'route_get_user_history');
+      const result = await attendanceUsecase.getUserAttendanceHistory(user_id, limit, date_from, date_to);
       
       if (result.success) {
         res.status(200).json(result);
@@ -160,13 +175,28 @@ function InitAttendanceRouter(attendanceUsecase) {
   });
 
   // Get asset attendance history (admin only)
-  router.get('/asset-history/:assetId', async (req, res) => {
+  router.get('/asset-history/:assetId', [
+    query('date_from').optional().isISO8601().withMessage('date_from must be a valid ISO 8601 date'),
+    query('date_to').optional().isISO8601().withMessage('date_to must be a valid ISO 8601 date'),
+    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('limit must be between 1 and 100'),
+  ], async (req, res) => {
     try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation error',
+          errors: errors.array()
+        });
+      }
+
       const { assetId } = req.params;
       const limit = parseInt(req.query.limit) || 10;
+      const date_from = req.query.date_from || null;
+      const date_to = req.query.date_to || null;
 
-      req.log?.info({ assetId, limit }, 'route_get_asset_history');
-      const result = await attendanceUsecase.getAssetAttendanceHistory(assetId, limit);
+      req.log?.info({ assetId, limit, date_from, date_to }, 'route_get_asset_history');
+      const result = await attendanceUsecase.getAssetAttendanceHistory(assetId, limit, date_from, date_to);
       
       if (result.success) {
         res.status(200).json(result);
