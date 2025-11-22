@@ -29,6 +29,11 @@ TenantPaymentLog.init({
     type: DataTypes.FLOAT,
     allowNull: false,
   },
+  paid_amount: {
+    type: DataTypes.FLOAT,
+    allowNull: true,
+    comment: 'Amount paid - will be filled when payment is made'
+  },
   payment_date: {
     type: DataTypes.DATE,
     allowNull: true,

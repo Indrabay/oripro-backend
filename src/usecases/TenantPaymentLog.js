@@ -18,10 +18,11 @@ class TenantPaymentLogUsecase {
       }
 
       // Create payment log
-      // payment_date can be null initially, will be filled when payment is made
+      // payment_date and paid_amount can be null initially, will be filled when payment is made
       const paymentLog = await this.tenantPaymentLogRepository.create({
         tenant_id: data.tenant_id,
         amount: data.amount,
+        paid_amount: null, // Can be null, will be filled when payment is made
         payment_date: null, // Can be null, will be filled when payment is made
         payment_deadline: data.payment_deadline, // Payment deadline (required)
         payment_method: data.payment_method,

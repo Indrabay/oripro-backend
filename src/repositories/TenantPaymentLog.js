@@ -12,6 +12,7 @@ class TenantPaymentLogRepository {
       const paymentLog = await this.tenantPaymentLogModel.create({
         tenant_id: data.tenant_id,
         amount: data.amount,
+        paid_amount: data.paid_amount || null, // Can be null, will be filled when payment is made
         payment_date: data.payment_date || null, // Can be null, will be filled when payment is made
         payment_deadline: data.payment_deadline, // Payment deadline (required)
         payment_method: data.payment_method,

@@ -269,6 +269,7 @@ function InitTenantRouter(TenantUseCase, TenantPaymentLogUsecase) {
     param('paymentId').isInt({ min: 1 }).withMessage('Payment ID must be a valid integer'),
     body('payment_method').optional().isIn(['cash', 'bank_transfer', 'qris', 'other']).withMessage('payment_method must be one of: cash, bank_transfer, qris, other'),
     body('payment_date').optional().isISO8601().withMessage('payment_date must be a valid date'),
+    body('paid_amount').optional().isFloat({ min: 0 }).withMessage('paid_amount must be a valid number (>= 0)'),
     body('notes').optional().isString(),
   ], async (req, res) => {
     const errors = validationResult(req);

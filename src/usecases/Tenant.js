@@ -250,6 +250,7 @@ class TenantUseCase {
               const paymentLogData = {
                 tenant_id: tenant.id,
                 amount: paymentAmount,
+                paid_amount: null, // Will be filled when payment is made
                 payment_date: null,
                 payment_deadline: paymentDeadline.toDate(),
                 payment_method: 'other', // Default payment method, can be updated later
