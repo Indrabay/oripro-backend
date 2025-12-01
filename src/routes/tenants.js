@@ -241,8 +241,8 @@ function InitTenantRouter(TenantUseCase, TenantPaymentLogUsecase) {
       const result = await TenantPaymentLogUsecase.getPaymentLogsByTenantId(req.params.id, {
         limit: req.query.limit || 10,
         offset: req.query.offset || 0,
-        orderBy: req.query.orderBy || 'payment_deadline',
-        order: req.query.order || 'ASC',
+        orderBy: req.query.orderBy || 'payment_date',
+        order: req.query.order || 'DESC',
         status: req.query.status, // Filter by status (unpaid, paid, expired, or 0, 1, 2)
       }, {
         userId: req.auth.userId,

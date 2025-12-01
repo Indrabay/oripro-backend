@@ -1,3 +1,5 @@
+const { Sequelize } = require('sequelize');
+
 class TenantPaymentLogRepository {
   constructor(tenantPaymentLogModel, tenantModel, userModel) {
     this.tenantPaymentLogModel = tenantPaymentLogModel;
@@ -14,7 +16,7 @@ class TenantPaymentLogRepository {
         amount: data.amount,
         paid_amount: data.paid_amount || null, // Can be null, will be filled when payment is made
         payment_date: data.payment_date || null, // Can be null, will be filled when payment is made
-        payment_deadline: data.payment_deadline, // Payment deadline (required)
+        payment_deadline: data.payment_deadline || null, // Payment deadline (optional)
         payment_method: data.payment_method,
         status: data.status !== undefined ? data.status : 0, // Default to 0 (unpaid) if not provided
         notes: data.notes || null,
@@ -63,7 +65,7 @@ class TenantPaymentLogRepository {
   async findByTenantId(tenantId, queryParams = {}, ctx = {}) {
     try {
       ctx.log?.info({ tenantId, queryParams }, 'TenantPaymentLogRepository.findByTenantId');
-      const { limit = 10, offset = 0, orderBy = 'payment_deadline', order = 'ASC', status } = queryParams;
+      const { limit = 10, offset = 0, orderBy = 'payment_date', order = 'DESC', status } = queryParams;
       
       // Build where clause
       const whereClause = { tenant_id: tenantId };
@@ -86,11 +88,18 @@ class TenantPaymentLogRepository {
         whereClause.status = statusInt;
       }
       
+      // Build order clause: always sort by payment_date ASC first, then payment_deadline ASC
+      // NULLS LAST ensures null payment_date values come after non-null values
+      let orderClause = [
+        Sequelize.literal(`payment_date ASC NULLS LAST`),
+        ['payment_deadline', 'ASC']
+      ];
+      
       const { rows, count } = await this.tenantPaymentLogModel.findAndCountAll({
         where: whereClause,
         limit: parseInt(limit),
         offset: parseInt(offset),
-        order: [[orderBy, order]],
+        order: orderClause,
         include: [
           {
             model: this.userModel,

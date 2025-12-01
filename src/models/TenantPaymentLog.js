@@ -41,7 +41,7 @@ TenantPaymentLog.init({
   },
   payment_deadline: {
     type: DataTypes.DATE,
-    allowNull: false,
+    allowNull: true,
     comment: 'Payment deadline date for this payment'
   },
   payment_method: {
