@@ -3,6 +3,7 @@ const { authMiddleware, ensureRole } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { compressUploadedImages } = require('../middleware/imageCompressor');
 
 function InitUploadRouter() {
   const router = Router();
@@ -38,7 +39,7 @@ function InitUploadRouter() {
   });
 
   // Simple upload route without auth for testing
-  router.post('/simple-upload', upload.single('file'), (req, res) => {
+  router.post('/simple-upload', upload.single('file'), compressUploadedImages, (req, res) => {
     
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -55,7 +56,7 @@ function InitUploadRouter() {
   });
 
   // Tenant upload route with auth
-  router.post('/:type', authMiddleware, ensureRole, upload.single('file'), (req, res) => {
+  router.post('/:type', authMiddleware, ensureRole, upload.single('file'), compressUploadedImages, (req, res) => {
     
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });

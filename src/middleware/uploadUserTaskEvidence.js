@@ -1,6 +1,7 @@
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
+const { compressUploadedImages } = require("./imageCompressor");
 
 function uploadUserTaskEvidenceMiddleware() {
   const storage = multer.diskStorage({

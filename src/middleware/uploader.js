@@ -1,6 +1,7 @@
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
+const { compressUploadedImages } = require("./imageCompressor");
 
 function uploadMiddleware(req, res, next) {
   const storage = multer.diskStorage({
@@ -30,7 +31,7 @@ function uploadMiddleware(req, res, next) {
     { name: 'file', maxCount: 10 }
   ]);
 
-  uploadHandler(req, res, function (err) {
+  uploadHandler(req, res, async function (err) {
     
     if (err instanceof multer.MulterError) {
       if (err.code === "LIMIT_FILE_SIZE") {
@@ -47,6 +48,14 @@ function uploadMiddleware(req, res, next) {
     // if (!req.files || req.files.length === 0) {
     //   return res.status(400).json({ error: "No files uploaded" });
     // }
+
+    // Compress uploaded images
+    try {
+      await compressUploadedImages(req, res, () => {});
+    } catch (compressionError) {
+      console.error('Error compressing images:', compressionError);
+      // Continue even if compression fails
+    }
 
     next();
   });

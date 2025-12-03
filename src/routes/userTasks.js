@@ -3,6 +3,7 @@ const { body, validationResult, param, query } = require("express-validator");
 const { authMiddleware, ensureRole } = require("../middleware/auth");
 const { createResponse } = require("../services/response");
 const uploadUserTaskEvidenceMiddleware = require("../middleware/uploadUserTaskEvidence");
+const { compressUploadedImages } = require("../middleware/imageCompressor");
 
 function InitUserTaskRouter(userTaskUsecase) {
   const router = Router();
@@ -273,7 +274,7 @@ function InitUserTaskRouter(userTaskUsecase) {
   router.get("/", getUserTasksParam, getUserTasks);
   router.get("/upcoming", getUpcomingUserTasks);
   router.put("/:id/start", startUserTaskParam, startUserTask);
-  router.put("/:id/complete", uploadUserTaskEvidenceMiddleware(), completeUserTaskParam, completeUserTask);
+  router.put("/:id/complete", uploadUserTaskEvidenceMiddleware(), compressUploadedImages, completeUserTaskParam, completeUserTask);
 
   return router;
 }
