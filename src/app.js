@@ -48,6 +48,7 @@ const TenantLogRepository = require('./repositories/TenantLog');
 const DepositoLogRepository = require('./repositories/DepositoLog');
 const ComplaintReportRepository = require('./repositories/ComplaintReport');
 const ComplaintReportEvidenceRepository = require('./repositories/ComplaintReportEvidence');
+const ComplaintReportLogRepository = require('./repositories/ComplaintReportLog');
 const AttendanceRepository = require('./repositories/Attendance');
 const UserAssetRepository = require('./repositories/UserAsset');
 const TaskRepository = require('./repositories/Task');
@@ -100,6 +101,7 @@ const modelTenantLog = require('./models/TenantLog');
 const modelDepositoLog = require('./models/DepositoLog');
 const { ComplaintReport } = require('./models/ComplaintReport');
 const modelComplaintReportEvidence = require('./models/ComplaintReportEvidence');
+const modelComplaintReportLog = require('./models/ComplaintReportLog');
 const modelUserAsset = require('./models/UserAsset');
 const modelTask = require('./models/Task');
 const modelTaskSchedule = require('./models/TaskSchedule');
@@ -131,7 +133,8 @@ const userLogRepository = new UserLogRepository(modelUserLog, User, modelRole)
 const unitLogRepository = new UnitLogRepository(modelUnitLog, User)
 const tenantLogRepository = new TenantLogRepository(modelTenantLog, User);
 const depositoLogRepository = new DepositoLogRepository(modelDepositoLog, User);
-const complaintReportRepository = new ComplaintReportRepository(ComplaintReport, User, Tenant, modelComplaintReportEvidence);
+const complaintReportLogRepository = new ComplaintReportLogRepository(modelComplaintReportLog, User);
+const complaintReportRepository = new ComplaintReportRepository(ComplaintReport, User, Tenant, modelComplaintReportEvidence, modelComplaintReportLog);
 const complaintReportEvidenceRepository = new ComplaintReportEvidenceRepository(modelComplaintReportEvidence, ComplaintReport);
 const userAssetRepository = new UserAssetRepository(modelUserAsset);
 const taskRepository = new TaskRepository(modelTask, User, modelRole, Asset, modelTaskGroup, modelTaskParent);
@@ -168,6 +171,7 @@ const models = {
   DepositoLog: modelDepositoLog,
   ComplaintReport: ComplaintReport,
   ComplaintReportEvidence: modelComplaintReportEvidence,
+  ComplaintReportLog: modelComplaintReportLog,
   UserAsset: modelUserAsset,
   Task: modelTask,
   TaskSchedule: modelTaskSchedule,
@@ -212,7 +216,7 @@ const taskUsecase = new taskUc(taskRepository, taskScheduleRepository, taskLogRe
 const taskGroupUsecase = new taskGroupUc(taskGroupRepository);
 const userTaskUsecase = new userTaskUc(userTaskRepository, taskRepository, taskScheduleRepository, userTaskEvidenceRepository);
 const scanInfoUsecase = new scanInfoUc(scanInfoRepository);
-const complaintReportUsecase = new complaintReportUc(complaintReportRepository, userRepository, tenantRepository, complaintReportEvidenceRepository);
+const complaintReportUsecase = new complaintReportUc(complaintReportRepository, userRepository, tenantRepository, complaintReportEvidenceRepository, complaintReportLogRepository);
 const attendanceRepository = new AttendanceRepository();
 const attendanceUsecase = new attendanceUc(attendanceRepository);
 const tenantPaymentLogUsecase = new tenantPaymentLogUc(tenantPaymentLogRepository, tenantRepository);
@@ -245,6 +249,8 @@ const complaintReportRouter = InitComplaintReportRouter(complaintReportUsecase);
 const userTaskRouter = require('./routes/userTasks').InitUserTaskRouter(userTaskUsecase);
 const { InitDashboardRouter } = require('./routes/dashboard');
 const dashboardRouter = InitDashboardRouter(dashboardUsecase);
+const { InitTestEmailRouter } = require('./routes/testEmail');
+const testEmailRouter = InitTestEmailRouter();
 
 // Middleware
 app.use(helmet());
@@ -394,6 +400,7 @@ app.use('/api/user-tasks', userTaskRouter);
 app.use('/api/complaint-reports', complaintReportRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/attendances', attendanceRouter);
+app.use('/api/test-email', testEmailRouter);
 app.get('/metrics', metricsHandler);
 
 // 404 handler

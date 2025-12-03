@@ -1,11 +1,12 @@
 const { Op } = require('sequelize');
 
 class ComplaintReportRepository {
-  constructor(complaintReportModel, userModel, tenantModel, complaintReportEvidenceModel) {
+  constructor(complaintReportModel, userModel, tenantModel, complaintReportEvidenceModel, complaintReportLogModel) {
     this.complaintReportModel = complaintReportModel;
     this.userModel = userModel;
     this.tenantModel = tenantModel;
     this.complaintReportEvidenceModel = complaintReportEvidenceModel;
+    this.complaintReportLogModel = complaintReportLogModel;
   }
 
   async create(data, ctx = {}, tx = null) {
@@ -63,6 +64,18 @@ class ComplaintReportRepository {
             attributes: ['id', 'url', 'created_at'],
             required: false
           },
+          ...(this.complaintReportLogModel ? [{
+            model: this.complaintReportLogModel,
+            as: 'logs',
+            attributes: ['id', 'old_status', 'new_status', 'notes', 'photo_evidence_url', 'created_at'],
+            include: [{
+              model: this.userModel,
+              as: 'createdBy',
+              attributes: ['id', 'name', 'email']
+            }],
+            required: false,
+            order: [['created_at', 'DESC']]
+          }] : []),
         ],
         transaction: tx || ctx.transaction
       });
@@ -124,6 +137,19 @@ class ComplaintReportRepository {
             attributes: ['id', 'url', 'created_at'],
             required: false
           },
+          ...(this.complaintReportLogModel ? [{
+            model: this.complaintReportLogModel,
+            as: 'logs',
+            attributes: ['id', 'old_status', 'new_status', 'notes', 'photo_evidence_url', 'created_at'],
+            include: [{
+              model: this.userModel,
+              as: 'createdBy',
+              attributes: ['id', 'name', 'email']
+            }],
+            required: false,
+            separate: true,
+            order: [['created_at', 'DESC']]
+          }] : []),
         ],
         order: [['created_at', 'DESC']]
       };

@@ -8,11 +8,12 @@ const {
 } = require('../models/ComplaintReport');
 
 class ComplaintReportUsecase {
-  constructor(complaintReportRepository, userRepository, tenantRepository, complaintReportEvidenceRepository) {
+  constructor(complaintReportRepository, userRepository, tenantRepository, complaintReportEvidenceRepository, complaintReportLogRepository) {
     this.complaintReportRepository = complaintReportRepository;
     this.userRepository = userRepository;
     this.tenantRepository = tenantRepository;
     this.complaintReportEvidenceRepository = complaintReportEvidenceRepository;
+    this.complaintReportLogRepository = complaintReportLogRepository;
   }
 
   async createComplaintReport(data, ctx) {
@@ -124,11 +125,22 @@ class ComplaintReportUsecase {
       }
 
       // Convert status and priority to string
-      return {
+      const result = {
         ...complaintReport,
         status: ComplaintReportStatusIntToStr[complaintReport.status],
         priority: ComplaintReportPriorityIntToStr[complaintReport.priority],
       };
+
+      // Convert log status values to strings if logs exist
+      if (result.logs && Array.isArray(result.logs)) {
+        result.logs = result.logs.map(log => ({
+          ...log,
+          old_status: log.old_status !== null ? ComplaintReportStatusIntToStr[log.old_status] : null,
+          new_status: ComplaintReportStatusIntToStr[log.new_status],
+        }));
+      }
+
+      return result;
     } catch (error) {
       ctx.log?.error({ id, error: error.message }, 'ComplaintReportUsecase.getComplaintReportById_error');
       throw error;
@@ -169,11 +181,24 @@ class ComplaintReportUsecase {
       const result = await this.complaintReportRepository.findAll(queryFilters, ctx);
 
       // Convert status and priority to string for each item
-      const complaintReports = result.complaintReports.map(cr => ({
-        ...cr,
-        status: ComplaintReportStatusIntToStr[cr.status],
-        priority: ComplaintReportPriorityIntToStr[cr.priority],
-      }));
+      const complaintReports = result.complaintReports.map(cr => {
+        const converted = {
+          ...cr,
+          status: ComplaintReportStatusIntToStr[cr.status],
+          priority: ComplaintReportPriorityIntToStr[cr.priority],
+        };
+
+        // Convert log status values to strings if logs exist
+        if (converted.logs && Array.isArray(converted.logs)) {
+          converted.logs = converted.logs.map(log => ({
+            ...log,
+            old_status: log.old_status !== null ? ComplaintReportStatusIntToStr[log.old_status] : null,
+            new_status: ComplaintReportStatusIntToStr[log.new_status],
+          }));
+        }
+
+        return converted;
+      });
 
       return {
         complaintReports,
@@ -194,62 +219,85 @@ class ComplaintReportUsecase {
         throw new Error('Complaint/Report not found');
       }
 
-      // Convert status and priority from string to int if provided
-      const updateData = { ...data };
-      if (updateData.status !== undefined && typeof updateData.status === 'string') {
-        updateData.status = ComplaintReportStatusStrToInt[updateData.status];
-      }
-      if (updateData.priority !== undefined && typeof updateData.priority === 'string') {
-        updateData.priority = ComplaintReportPriorityStrToInt[updateData.priority];
+      // Only status can be updated - reject any other fields
+      if (data.title !== undefined || data.description !== undefined || 
+          data.priority !== undefined || data.evidences !== undefined ||
+          data.reporter_id !== undefined || data.tenant_id !== undefined) {
+        throw new Error('Only status can be updated. Title, description, priority, and evidences cannot be modified.');
       }
 
-      updateData.updated_by = ctx.userId;
+      // Status is required
+      if (data.status === undefined) {
+        throw new Error('Status is required');
+      }
+
+      // Notes are required
+      if (!data.status_update_notes || !data.status_update_notes.trim()) {
+        throw new Error('Notes are required');
+      }
+
+      // Photo evidence is required
+      if (!data.status_update_photo_evidence || !data.status_update_photo_evidence.trim()) {
+        throw new Error('Photo evidence is required');
+      }
+
+      // Convert status from string to int if provided
+      const oldStatus = existing.status;
+      let newStatus;
+      
+      if (typeof data.status === 'string') {
+        newStatus = ComplaintReportStatusStrToInt[data.status];
+      } else {
+        newStatus = data.status;
+      }
+
+      // Check if status is being changed
+      const isStatusChange = oldStatus !== newStatus;
 
       // Use transaction to ensure atomicity
       const result = await sequelize.transaction(async (tx) => {
         const transactionCtx = { ...ctx, transaction: tx };
         
-        // Extract evidences from updateData if present
-        const evidences = updateData.evidences;
-        delete updateData.evidences;
+        // Only update status
+        const updateData = {
+          status: newStatus,
+          updated_by: ctx.userId,
+        };
         
         const updated = await this.complaintReportRepository.update(id, updateData, transactionCtx);
         
-        // Handle evidences if provided
-        if (evidences !== undefined) {
-          // Delete existing evidences
-          await this.complaintReportEvidenceRepository.deleteByComplaintReportId(id, transactionCtx, tx);
-          
-          // Create new evidences if provided
-          if (Array.isArray(evidences) && evidences.length > 0) {
-            for (const evidence of evidences) {
-              // Normalize evidence format: accept both string (URL) and object with url property
-              let evidenceUrl = null;
-              if (typeof evidence === 'string') {
-                evidenceUrl = evidence;
-              } else if (evidence && typeof evidence === 'object' && evidence.url) {
-                evidenceUrl = evidence.url;
-              }
-              
-              if (evidenceUrl) {
-                await this.complaintReportEvidenceRepository.create({
-                  complaint_report_id: id,
-                  url: evidenceUrl,
-                }, transactionCtx, tx);
-              }
-            }
-          }
+        // Create log entry with notes and photo evidence
+        if (this.complaintReportLogRepository) {
+          await this.complaintReportLogRepository.create({
+            complaint_report_id: id,
+            old_status: oldStatus,
+            new_status: newStatus,
+            notes: data.status_update_notes,
+            photo_evidence_url: data.status_update_photo_evidence,
+            created_by: ctx.userId,
+          }, transactionCtx, tx);
         }
         
-        // Fetch the updated complaint report with evidences
+        // Fetch the updated complaint report with evidences and logs
         const updatedWithEvidences = await this.complaintReportRepository.findById(id, transactionCtx, tx);
         
         // Convert status and priority back to string
-        return {
+        const result = {
           ...updatedWithEvidences,
           status: ComplaintReportStatusIntToStr[updatedWithEvidences.status],
           priority: ComplaintReportPriorityIntToStr[updatedWithEvidences.priority],
         };
+
+        // Convert log status values to strings if logs exist
+        if (result.logs && Array.isArray(result.logs)) {
+          result.logs = result.logs.map(log => ({
+            ...log,
+            old_status: log.old_status !== null ? ComplaintReportStatusIntToStr[log.old_status] : null,
+            new_status: ComplaintReportStatusIntToStr[log.new_status],
+          }));
+        }
+
+        return result;
       });
 
       return result;
@@ -262,10 +310,60 @@ class ComplaintReportUsecase {
   async deleteComplaintReport(id, ctx) {
     try {
       ctx.log?.info({ id }, 'ComplaintReportUsecase.deleteComplaintReport');
+
+      // Get the complaint report to check permissions and status
+      const complaintReport = await this.complaintReportRepository.findById(id, ctx);
+      if (!complaintReport) {
+        throw new Error('Complaint/Report not found');
+      }
+
+      // Check if current user is the creator
+      if (complaintReport.created_by !== ctx.userId) {
+        throw new Error('Only the user who created the complaint/report can delete it');
+      }
+
+      // Check if status is pending (0) or in_progress (1)
+      const status = complaintReport.status;
+      if (status !== 0 && status !== 1) {
+        throw new Error('Complaint/Report can only be deleted when status is pending or in_progress');
+      }
+
+      // Proceed with deletion
       const result = await this.complaintReportRepository.delete(id, ctx);
       return result;
     } catch (error) {
       ctx.log?.error({ id, error: error.message }, 'ComplaintReportUsecase.deleteComplaintReport_error');
+      throw error;
+    }
+  }
+
+  async getComplaintReportLogs(id, ctx) {
+    try {
+      ctx.log?.info({ id }, 'ComplaintReportUsecase.getComplaintReportLogs');
+
+      // Verify complaint report exists
+      const complaintReport = await this.complaintReportRepository.findById(id, ctx);
+      if (!complaintReport) {
+        throw new Error('Complaint/Report not found');
+      }
+
+      // Get logs
+      if (!this.complaintReportLogRepository) {
+        throw new Error('Log repository not available');
+      }
+
+      const logs = await this.complaintReportLogRepository.findByComplaintReportId(id, ctx);
+
+      // Convert status values to strings
+      const convertedLogs = logs.map(log => ({
+        ...log,
+        old_status: log.old_status !== null ? ComplaintReportStatusIntToStr[log.old_status] : null,
+        new_status: ComplaintReportStatusIntToStr[log.new_status],
+      }));
+
+      return convertedLogs;
+    } catch (error) {
+      ctx.log?.error({ id, error: error.message }, 'ComplaintReportUsecase.getComplaintReportLogs_error');
       throw error;
     }
   }
