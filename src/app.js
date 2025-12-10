@@ -249,8 +249,8 @@ const complaintReportRouter = InitComplaintReportRouter(complaintReportUsecase);
 const userTaskRouter = require('./routes/userTasks').InitUserTaskRouter(userTaskUsecase);
 const { InitDashboardRouter } = require('./routes/dashboard');
 const dashboardRouter = InitDashboardRouter(dashboardUsecase);
-const { InitTestEmailRouter } = require('./routes/testEmail');
-const testEmailRouter = InitTestEmailRouter();
+// const { InitTestEmailRouter } = require('./routes/testEmail');
+// const testEmailRouter = InitTestEmailRouter();
 
 // Middleware
 app.use(helmet());
@@ -400,7 +400,7 @@ app.use('/api/user-tasks', userTaskRouter);
 app.use('/api/complaint-reports', complaintReportRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/attendances', attendanceRouter);
-app.use('/api/test-email', testEmailRouter);
+// app.use('/api/test-email', testEmailRouter);
 app.get('/metrics', metricsHandler);
 
 // 404 handler
