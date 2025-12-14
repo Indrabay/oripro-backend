@@ -4,7 +4,6 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
 const path = require('path');
-const net = require('net');
 
 dotenv.config();
 
@@ -48,7 +47,6 @@ const TenantLogRepository = require('./repositories/TenantLog');
 const DepositoLogRepository = require('./repositories/DepositoLog');
 const ComplaintReportRepository = require('./repositories/ComplaintReport');
 const ComplaintReportEvidenceRepository = require('./repositories/ComplaintReportEvidence');
-const ComplaintReportLogRepository = require('./repositories/ComplaintReportLog');
 const AttendanceRepository = require('./repositories/Attendance');
 const UserAssetRepository = require('./repositories/UserAsset');
 const TaskRepository = require('./repositories/Task');
@@ -101,7 +99,6 @@ const modelTenantLog = require('./models/TenantLog');
 const modelDepositoLog = require('./models/DepositoLog');
 const { ComplaintReport } = require('./models/ComplaintReport');
 const modelComplaintReportEvidence = require('./models/ComplaintReportEvidence');
-const modelComplaintReportLog = require('./models/ComplaintReportLog');
 const modelUserAsset = require('./models/UserAsset');
 const modelTask = require('./models/Task');
 const modelTaskSchedule = require('./models/TaskSchedule');
@@ -133,8 +130,7 @@ const userLogRepository = new UserLogRepository(modelUserLog, User, modelRole)
 const unitLogRepository = new UnitLogRepository(modelUnitLog, User)
 const tenantLogRepository = new TenantLogRepository(modelTenantLog, User);
 const depositoLogRepository = new DepositoLogRepository(modelDepositoLog, User);
-const complaintReportLogRepository = new ComplaintReportLogRepository(modelComplaintReportLog, User);
-const complaintReportRepository = new ComplaintReportRepository(ComplaintReport, User, Tenant, modelComplaintReportEvidence, modelComplaintReportLog);
+const complaintReportRepository = new ComplaintReportRepository(ComplaintReport, User, Tenant, modelComplaintReportEvidence);
 const complaintReportEvidenceRepository = new ComplaintReportEvidenceRepository(modelComplaintReportEvidence, ComplaintReport);
 const userAssetRepository = new UserAssetRepository(modelUserAsset);
 const taskRepository = new TaskRepository(modelTask, User, modelRole, Asset, modelTaskGroup, modelTaskParent);
@@ -171,7 +167,6 @@ const models = {
   DepositoLog: modelDepositoLog,
   ComplaintReport: ComplaintReport,
   ComplaintReportEvidence: modelComplaintReportEvidence,
-  ComplaintReportLog: modelComplaintReportLog,
   UserAsset: modelUserAsset,
   Task: modelTask,
   TaskSchedule: modelTaskSchedule,
@@ -216,7 +211,7 @@ const taskUsecase = new taskUc(taskRepository, taskScheduleRepository, taskLogRe
 const taskGroupUsecase = new taskGroupUc(taskGroupRepository);
 const userTaskUsecase = new userTaskUc(userTaskRepository, taskRepository, taskScheduleRepository, userTaskEvidenceRepository);
 const scanInfoUsecase = new scanInfoUc(scanInfoRepository);
-const complaintReportUsecase = new complaintReportUc(complaintReportRepository, userRepository, tenantRepository, complaintReportEvidenceRepository, complaintReportLogRepository);
+const complaintReportUsecase = new complaintReportUc(complaintReportRepository, userRepository, tenantRepository, complaintReportEvidenceRepository);
 const attendanceRepository = new AttendanceRepository();
 const attendanceUsecase = new attendanceUc(attendanceRepository);
 const tenantPaymentLogUsecase = new tenantPaymentLogUc(tenantPaymentLogRepository, tenantRepository);
@@ -249,13 +244,11 @@ const complaintReportRouter = InitComplaintReportRouter(complaintReportUsecase);
 const userTaskRouter = require('./routes/userTasks').InitUserTaskRouter(userTaskUsecase);
 const { InitDashboardRouter } = require('./routes/dashboard');
 const dashboardRouter = InitDashboardRouter(dashboardUsecase);
-// const { InitTestEmailRouter } = require('./routes/testEmail');
-// const testEmailRouter = InitTestEmailRouter();
 
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3002', 'https://oripro-frontend-eight.vercel.app'],
+  origin: ['http://localhost:3000', 'http://localhost:3002', 'http://72.61.209.184:3000'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -400,7 +393,6 @@ app.use('/api/user-tasks', userTaskRouter);
 app.use('/api/complaint-reports', complaintReportRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/attendances', attendanceRouter);
-// app.use('/api/test-email', testEmailRouter);
 app.get('/metrics', metricsHandler);
 
 // 404 handler
@@ -432,39 +424,13 @@ process.on('unhandledRejection', (reason, promise) => {
   // Don't exit the process, but log it
 });
 
-// Function to find an available port
-function findAvailablePort(startPort = 3000) {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    
-    server.listen(startPort, () => {
-      const port = server.address().port;
-      server.close(() => {
-        resolve(port);
-      });
-    });
-    
-    server.on('error', (err) => {
-      if (err.code === 'EADDRINUSE') {
-        // Port is in use, try the next one
-        findAvailablePort(startPort + 1).then(resolve).catch(reject);
-      } else {
-        reject(err);
-      }
-    });
-  });
-}
 
 // Only start server when not running on Vercel
 // Vercel serverless functions don't need app.listen()
 if (process.env.VERCEL !== '1' && !process.env.VERCEL_ENV) {
-  findAvailablePort(3000).then((PORT) => {
-    app.listen(PORT, () => {
-      console.log(`Server listening on http://localhost:${PORT}`);
-    });
-  }).catch((err) => {
-    console.error('Failed to find available port:', err);
-    process.exit(1);
+  const PORT = process.env.PORT || 3001;
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server listening on http://localhost:${PORT}`);
   });
 }
 
