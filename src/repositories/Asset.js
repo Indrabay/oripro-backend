@@ -95,18 +95,17 @@ class AssetRepository {
   async listAll(queryParams, ctx = {}) {
     ctx.log?.debug({}, "repo_assets_list_all");
     let whereQuery = {};
-    if (queryParams.name || queryParams.asset_type) {
-      whereQuery.where = {};
-      if (queryParams.name) {
-        let nameParam = queryParams.name.toLowerCase();
-        whereQuery.where.name = {
-          [Op.like]: `%${nameParam}%`,
-        };
-      }
+    whereQuery.where = {
+      is_deleted: false
+    };
+    if (queryParams.name) {
+      whereQuery.where.name = {
+        [Op.iLike]: `%${queryParams.name}%`,
+      };
+    }
 
-      if (queryParams.asset_type) {
-        whereQuery.where.asset_type = queryParams.asset_type
-      }
+    if (queryParams.asset_type) {
+      whereQuery.where.asset_type = queryParams.asset_type
     }
     if (queryParams.limit) {
       whereQuery.limit = parseInt(queryParams.limit);
@@ -178,7 +177,7 @@ class AssetRepository {
 
   async update(
     id,
-    { name, description, asset_type, longitude, latitude, updatedBy },
+    { name, description, asset_type, address, area, status, longitude, latitude, updatedBy },
     ctx = {}
   ) {
     ctx.log?.info({ id }, "repo_assets_update");
@@ -188,6 +187,9 @@ class AssetRepository {
       name: name ?? asset.name,
       description: description ?? asset.description,
       asset_type: asset_type ?? asset.asset_type,
+      address: address ?? asset.address,
+      area: area ?? asset.area,
+      status: status ?? asset.status,
       longitude: longitude ?? asset.longitude,
       latitude: latitude ?? asset.latitude,
       updated_by: updatedBy ?? asset.updated_by,
@@ -199,10 +201,8 @@ class AssetRepository {
   async delete(id, ctx = {}) {
     ctx.log?.info({ id }, "repo_assets_delete");
     const asset = await this.assetModel.findByPk(id);
-    await this.assetModel.update({
-      is_deleted: true,
-      updated_by: ctx.userId,
-    });
+    if (!asset) return null;
+    await asset.destroy();
     return asset.toJSON();
   }
 }

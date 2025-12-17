@@ -108,7 +108,7 @@ class UnitRepository {
       if (filter.name) {
         const nameParam = filter.name.toLowerCase();
         whereQuery.where.name = {
-          [Op.like]: `%${nameParam}%`,
+          [Op.iLike]: `%${nameParam}%`,
         };
       }
 
