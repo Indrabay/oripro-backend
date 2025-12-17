@@ -21,6 +21,7 @@ const { InitMenuRouter } = require('./routes/menus');
 const { InitScanInfoRouter } = require('./routes/scanInfos');
 const { InitTaskGroupRouter } = require('./routes/taskGroups');
 const { InitComplaintReportRouter } = require('./routes/complaintReports');
+const { InitInternalRouter } = require('./routes/internal');
 const { requestContext } = require('./middleware/requestContext');
 const { metricsMiddleware, metricsHandler } = require('./services/metrics');
 
@@ -248,6 +249,7 @@ const complaintReportRouter = InitComplaintReportRouter(complaintReportUsecase);
 const userTaskRouter = require('./routes/userTasks').InitUserTaskRouter(userTaskUsecase);
 const { InitDashboardRouter } = require('./routes/dashboard');
 const dashboardRouter = InitDashboardRouter(dashboardUsecase);
+const internalRouter = InitInternalRouter({ tenantRepository, tenantPaymentLogRepository });
 
 // Middleware
 app.use(helmet());
@@ -381,6 +383,18 @@ app.use('/uploads', express.static(path.join(__dirname, '../public/uploads'), {
   }
 }));
 
+// Disable caching for all non-static GET responses
+// (Placed AFTER express.static so static files can keep their caching behavior)
+app.use((req, res, next) => {
+  if (req.method === 'GET') {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+  }
+  next();
+});
+
 // Routes
 app.use('/api/auth', authRouter);
 app.use('/api/assets', assetRouter);
@@ -397,6 +411,7 @@ app.use('/api/user-tasks', userTaskRouter);
 app.use('/api/complaint-reports', complaintReportRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/attendances', attendanceRouter);
+app.use('/api/internal', internalRouter);
 app.get('/metrics', metricsHandler);
 
 // 404 handler

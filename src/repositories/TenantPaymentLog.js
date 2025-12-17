@@ -1,4 +1,4 @@
-const { Sequelize } = require('sequelize');
+const { Sequelize, Op } = require('sequelize');
 
 class TenantPaymentLogRepository {
   constructor(tenantPaymentLogModel, tenantModel, userModel) {
@@ -156,6 +156,51 @@ class TenantPaymentLogRepository {
       return true;
     } catch (error) {
       ctx.log?.error({ id, error }, 'TenantPaymentLogRepository.delete_error');
+      throw error;
+    }
+  }
+
+  /**
+   * Find unpaid payment logs with a deadline between now and (now + days).
+   * Intended for internal notification jobs.
+   */
+  async findUnpaidDueSoon({ days = 7, now = new Date() } = {}, ctx = {}) {
+    try {
+      const daysInt = Number(days);
+      const safeDays = Number.isFinite(daysInt) && daysInt >= 0 ? daysInt : 7;
+      const start = now;
+      const end = new Date(now.getTime() + safeDays * 24 * 60 * 60 * 1000);
+
+      ctx.log?.info({ days: safeDays, start, end }, 'TenantPaymentLogRepository.findUnpaidDueSoon');
+
+      const rows = await this.tenantPaymentLogModel.findAll({
+        where: {
+          status: 0, // unpaid
+          payment_deadline: { [Op.ne]: null, [Op.between]: [start, end] },
+          reminder_sent_at: null,
+        },
+        order: [['payment_deadline', 'ASC']],
+        include: [
+          {
+            model: this.tenantModel,
+            as: 'tenant',
+            attributes: ['id', 'name', 'code', 'user_id'],
+            include: [
+              {
+                model: this.userModel,
+                as: 'user',
+                attributes: ['id', 'name', 'email'],
+                required: false,
+              },
+            ],
+            required: false,
+          },
+        ],
+      });
+
+      return rows.map(r => r.toJSON());
+    } catch (error) {
+      ctx.log?.error({ error }, 'TenantPaymentLogRepository.findUnpaidDueSoon_error');
       throw error;
     }
   }

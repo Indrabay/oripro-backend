@@ -27,6 +27,37 @@ async function sendPasswordResetEmail({ to, resetUrl }) {
   });
 }
 
-module.exports = { sendPasswordResetEmail };
+async function sendTenantPaymentDueSoonEmail({ to, tenantName, tenantCode, paymentId, amount, deadline, daysLeft }) {
+  const { transport, from } = createTransportFromEnv();
+  const subject = `Pengingat Pembayaran: tersisa ${daysLeft} hari`;
+
+  const deadlineStr = deadline ? new Date(deadline).toISOString().slice(0, 10) : '-';
+  const safeTenant = tenantName || tenantCode || 'Tenant';
+  const safeAmount = amount != null ? String(amount) : '-';
+
+  const text =
+    `Halo ${safeTenant},\n\n` +
+    `Ini adalah pengingat bahwa pembayaran Anda akan segera jatuh tempo.\n\n` +
+    `ID Pembayaran: ${paymentId}\n` +
+    `Jumlah: ${safeAmount}\n` +
+    `Batas Akhir Pembayaran: ${deadlineStr}\n` +
+    `Sisa Hari: ${daysLeft}\n\n` +
+    `Terima kasih.`;
+
+  const html =
+    `<p>Halo <b>${safeTenant}</b>,</p>` +
+    `<p>Ini adalah pengingat bahwa pembayaran Anda akan segera jatuh tempo.</p>` +
+    `<ul>` +
+    `<li><b>ID Pembayaran</b>: ${paymentId}</li>` +
+    `<li><b>Jumlah</b>: ${safeAmount}</li>` +
+    `<li><b>Batas Akhir Pembayaran</b>: ${deadlineStr}</li>` +
+    `<li><b>Sisa Hari</b>: ${daysLeft}</li>` +
+    `</ul>` +
+    `<p>Terima kasih.</p>`;
+
+  await transport.sendMail({ from, to, subject, text, html });
+}
+
+module.exports = { sendPasswordResetEmail, sendTenantPaymentDueSoonEmail };
 
 

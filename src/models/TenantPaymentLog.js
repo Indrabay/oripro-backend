@@ -44,6 +44,11 @@ TenantPaymentLog.init({
     allowNull: true,
     comment: 'Payment deadline date for this payment'
   },
+  reminder_sent_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    comment: 'When the payment reminder email was sent'
+  },
   payment_method: {
     type: DataTypes.ENUM('cash', 'bank_transfer', 'qris', 'other'),
     allowNull: false,
@@ -83,6 +88,7 @@ TenantPaymentLog.init({
     { fields: ['tenant_id'] },
     { fields: ['payment_date'] },
     { fields: ['payment_deadline'] },
+    { fields: ['reminder_sent_at'] },
     { fields: ['created_at'] },
     { fields: ['status'] },
   ],
