@@ -62,8 +62,7 @@ function InitUploadRouter() {
       return res.status(400).json({ error: 'No file uploaded' });
     }
     
-    const host = req.protocol + '://' + req.get('host');
-    const fileUrl = `${host}/uploads/${req.params.type}/${req.file.filename}`;
+    const fileUrl = getUploadUrl(`${req.params.type}/${req.file.filename}`, req);
     
     res.json({
       url: [fileUrl]

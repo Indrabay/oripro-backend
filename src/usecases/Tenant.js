@@ -8,6 +8,7 @@ const {
   TenantStatusIntToStr,
 } = require("../models/Tenant");
 const { AttachmentType } = require("../models/TenantAttachment");
+const { transformImageUrls } = require('../services/baseUrl');
 
 class TenantUseCase {
   constructor(
@@ -382,8 +383,8 @@ class TenantUseCase {
             }
           }
 
-          tenant.tenant_identifications = idAttachments;
-          tenant.contract_documents = contractAttachments;
+          tenant.tenant_identifications = transformImageUrls(idAttachments);
+          tenant.contract_documents = transformImageUrls(contractAttachments);
         }
 
         // Category is now included via association in repository
@@ -424,6 +425,10 @@ class TenantUseCase {
               let unit = await this.unitRepository.findById(
                 tenantUnits[i].unit_id
               );
+              // Transform unit photos if they exist
+              if (unit && unit.photos) {
+                unit.photos = transformImageUrls(unit.photos);
+              }
               units.push(unit);
             }
             tenant.units = units;
@@ -443,8 +448,8 @@ class TenantUseCase {
               }
             }
 
-            tenant.tenant_identifications = idAttachments;
-            tenant.contract_documents = contractAttachments;
+            tenant.tenant_identifications = transformImageUrls(idAttachments);
+            tenant.contract_documents = transformImageUrls(contractAttachments);
           }
 
           // Category is now included via association in repository

@@ -4,6 +4,7 @@ const moment = require("moment");
 const PrefixAsset = "ASSET";
 
 const { AssetStatusIntToStr, AssetTypeIntToStr } = require('../models/Asset');
+const { transformImageUrls } = require('../services/baseUrl');
 
 class AssetUsecase {
   constructor(assetRepository, assetLogRepository, assetAttachmentRepository, unitRepository) {
@@ -145,8 +146,8 @@ class AssetUsecase {
       }
     }
 
-    asset.photos = photos;
-    asset.sketch = sketchs;
+    asset.photos = transformImageUrls(photos);
+    asset.sketch = transformImageUrls(sketchs);
     asset.asset_type = AssetTypeIntToStr[asset.asset_type];
         asset.status = AssetStatusIntToStr[asset.status];
     return asset;

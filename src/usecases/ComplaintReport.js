@@ -6,6 +6,7 @@ const {
   ComplaintReportPriorityStrToInt,
   ComplaintReportPriorityIntToStr,
 } = require('../models/ComplaintReport');
+const { transformEvidenceUrls, transformImageUrl } = require('../services/baseUrl');
 
 class ComplaintReportUsecase {
   constructor(complaintReportRepository, userRepository, tenantRepository, complaintReportEvidenceRepository, complaintReportLogRepository) {
@@ -101,11 +102,18 @@ class ComplaintReportUsecase {
         const complaintReportWithEvidences = await this.complaintReportRepository.findById(complaintReport.id, transactionCtx, tx);
         
         // Convert status and priority back to string for response
-        return {
+        const response = {
           ...complaintReportWithEvidences,
           status: ComplaintReportStatusIntToStr[complaintReportWithEvidences.status],
           priority: ComplaintReportPriorityIntToStr[complaintReportWithEvidences.priority],
         };
+        
+        // Transform evidence URLs
+        if (response.evidences) {
+          response.evidences = transformEvidenceUrls(response.evidences);
+        }
+        
+        return response;
       });
 
       return result;
@@ -137,7 +145,13 @@ class ComplaintReportUsecase {
           ...log,
           old_status: log.old_status !== null ? ComplaintReportStatusIntToStr[log.old_status] : null,
           new_status: ComplaintReportStatusIntToStr[log.new_status],
+          photo_evidence_url: log.photo_evidence_url ? transformImageUrl(log.photo_evidence_url) : log.photo_evidence_url,
         }));
+      }
+      
+      // Transform evidence URLs
+      if (result.evidences) {
+        result.evidences = transformEvidenceUrls(result.evidences);
       }
 
       return result;
@@ -194,7 +208,13 @@ class ComplaintReportUsecase {
             ...log,
             old_status: log.old_status !== null ? ComplaintReportStatusIntToStr[log.old_status] : null,
             new_status: ComplaintReportStatusIntToStr[log.new_status],
+            photo_evidence_url: log.photo_evidence_url ? transformImageUrl(log.photo_evidence_url) : log.photo_evidence_url,
           }));
+        }
+        
+        // Transform evidence URLs
+        if (converted.evidences) {
+          converted.evidences = transformEvidenceUrls(converted.evidences);
         }
 
         return converted;
@@ -294,7 +314,13 @@ class ComplaintReportUsecase {
             ...log,
             old_status: log.old_status !== null ? ComplaintReportStatusIntToStr[log.old_status] : null,
             new_status: ComplaintReportStatusIntToStr[log.new_status],
+            photo_evidence_url: log.photo_evidence_url ? transformImageUrl(log.photo_evidence_url) : log.photo_evidence_url,
           }));
+        }
+        
+        // Transform evidence URLs
+        if (result.evidences) {
+          result.evidences = transformEvidenceUrls(result.evidences);
         }
 
         return result;
@@ -359,6 +385,7 @@ class ComplaintReportUsecase {
         ...log,
         old_status: log.old_status !== null ? ComplaintReportStatusIntToStr[log.old_status] : null,
         new_status: ComplaintReportStatusIntToStr[log.new_status],
+        photo_evidence_url: log.photo_evidence_url ? transformImageUrl(log.photo_evidence_url) : log.photo_evidence_url,
       }));
 
       return convertedLogs;

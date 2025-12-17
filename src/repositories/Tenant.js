@@ -62,12 +62,11 @@ class TenantRepository {
   async findAll(filter = {}, ctx) {
     try {
       let whereQuery = {};
-      if (filter.name || filter.user_id || filter.status) {
+      if (filter.name || filter.user_id || filter.status || filter.category_id || filter.category) {
         whereQuery.where = {};
-        if (filter.name) {
-          let filterName = filter.name.toLowerCase();
+        if (filter.name && filter.name.trim()) {
           whereQuery.where.name = {
-            [Op.like]: `%${filterName}%`,
+            [Op.iLike]: `%${filter.name.trim()}%`,
           };
         }
 
@@ -77,6 +76,13 @@ class TenantRepository {
 
         if (filter.status) {
           whereQuery.where.status = filter.status;
+        }
+
+        // Support both 'category' and 'category_id' filter parameters
+        if (filter.category_id || filter.category) {
+          const categoryId = filter.category_id || filter.category;
+          // Convert to integer if it's a string
+          whereQuery.where.category_id = typeof categoryId === 'string' ? parseInt(categoryId, 10) : categoryId;
         }
       }
 
@@ -103,6 +109,15 @@ class TenantRepository {
           required: false,
         },
       ]
+
+      // Handle pagination
+      if (filter.limit) {
+        whereQuery.limit = parseInt(filter.limit);
+      }
+      if (filter.offset) {
+        whereQuery.offset = parseInt(filter.offset);
+      }
+
       const data = await this.tenantModel.findAndCountAll(whereQuery);
       return {
         tenants: data.rows.map(t => {

@@ -1,4 +1,5 @@
 const sequelize = require("../models/sequelize");
+const { transformEvidenceUrls } = require('../services/baseUrl');
 
 class UserTaskUsecase {
   constructor(userTaskRepository, taskRepository, taskScheduleRepository, userTaskEvidenceRepository) {
@@ -33,6 +34,9 @@ class UserTaskUsecase {
     try {
       ctx.log?.info({ code }, "UserTaskUsecase.getUserTaskByCode");
       const userTask = await this.userTaskRepository.findByCode(code, ctx);
+      if (userTask && userTask.evidences) {
+        userTask.evidences = transformEvidenceUrls(userTask.evidences);
+      }
       return userTask;
     } catch (error) {
       ctx.log?.error(
@@ -47,6 +51,23 @@ class UserTaskUsecase {
     try {
       ctx.log?.info({ userId, queryParams }, "UserTaskUsecase.getUserTasks");
       const result = await this.userTaskRepository.findByUserId(userId, queryParams, ctx);
+      if (Array.isArray(result)) {
+        return result.map(task => {
+          if (task.evidences) {
+            task.evidences = transformEvidenceUrls(task.evidences);
+          }
+          // Transform evidences in sub_user_task array
+          if (task.sub_user_task && Array.isArray(task.sub_user_task)) {
+            task.sub_user_task = task.sub_user_task.map(subTask => {
+              if (subTask.evidences) {
+                subTask.evidences = transformEvidenceUrls(subTask.evidences);
+              }
+              return subTask;
+            });
+          }
+          return task;
+        });
+      }
       return result;
     } catch (error) {
       ctx.log?.error(
@@ -61,6 +82,14 @@ class UserTaskUsecase {
     try {
       ctx.log?.info({ userId }, "UserTaskUsecase.getUpcomingUserTasks");
       const userTasks = await this.userTaskRepository.getUpcomingTasks(userId, 12, ctx);
+      if (Array.isArray(userTasks)) {
+        return userTasks.map(task => {
+          if (task.evidences) {
+            task.evidences = transformEvidenceUrls(task.evidences);
+          }
+          return task;
+        });
+      }
       return userTasks;
     } catch (error) {
       ctx.log?.error(
@@ -90,6 +119,10 @@ class UserTaskUsecase {
       }
 
       const result = await this.userTaskRepository.startTask(userTaskId, ctx);
+      // Transform evidence URLs in the result
+      if (result && result.evidences) {
+        result.evidences = transformEvidenceUrls(result.evidences);
+      }
       return result;
     } catch (error) {
       ctx.log?.error(
@@ -149,6 +182,11 @@ class UserTaskUsecase {
 
         return completedTask;
       });
+      
+      // Transform evidence URLs in the result
+      if (result && result.evidences) {
+        result.evidences = transformEvidenceUrls(result.evidences);
+      }
       
       return result;
     } catch (error) {

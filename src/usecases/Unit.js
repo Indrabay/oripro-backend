@@ -1,4 +1,5 @@
 const sequelize = require("../models/sequelize");
+const { transformImageUrls } = require('../services/baseUrl');
 
 class UnitUsecase {
   constructor(unitRepository, unitAttachmentRepository, unitLogRepository) {
@@ -67,7 +68,7 @@ class UnitUsecase {
         photos.push(attachments[i].url);
       }
     }
-    unit.photos = photos;
+    unit.photos = transformImageUrls(photos);
     return unit;
   }
 
