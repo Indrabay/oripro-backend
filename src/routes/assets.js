@@ -96,6 +96,25 @@ function InitAssetRouter(AssetUsecase) {
     }
   );
 
+  router.delete(
+    "/:id",
+    [param("id").isString().notEmpty()],
+    async (req, res) => {
+      req.log?.info({ id: req.params.id }, "route_assets_delete");
+      const deleted = await AssetUsecase.deleteAsset(req.params.id, {
+        requestId: req.requestId,
+        log: req.log,
+        roleName: req.auth.roleName,
+        userID: req.auth.userId,
+      });
+      if (!deleted)
+        return res.status(404).json(createResponse(null, "not found", 404));
+      if (deleted === "forbidden")
+        return res.status(403).json(createResponse(null, "forbidden", 403));
+      return res.status(200).json(createResponse(deleted, "Asset deleted successfully", 200));
+    }
+  );
+
   async function createAsset(req, res) {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {

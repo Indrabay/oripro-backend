@@ -236,8 +236,7 @@ class AssetUsecase {
 
     await this.assetLogRepository.create(assetLog, ctx);
 
-    await this.assetRepository.delete(asset.id, ctx);
-    return true;
+    return await this.assetRepository.delete(asset.id, ctx);
   }
 
   async getAssetLogs(id, ctx) {
