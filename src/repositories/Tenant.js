@@ -118,6 +118,30 @@ class TenantRepository {
         whereQuery.offset = parseInt(filter.offset);
       }
 
+      // Handle sorting
+      if (filter.order) {
+        let order;
+        switch (filter.order) {
+          case "oldest":
+            order = [["updated_at", "ASC"]];
+            break;
+          case "newest":
+            order = [["updated_at", "DESC"]];
+            break;
+          case "a-z":
+            order = [["name", "ASC"]];
+            break;
+          case "z-a":
+            order = [["name", "DESC"]];
+            break;
+          default:
+            break;
+        }
+        if (order) {
+          whereQuery.order = order;
+        }
+      }
+
       const data = await this.tenantModel.findAndCountAll(whereQuery);
       return {
         tenants: data.rows.map(t => {
@@ -160,6 +184,10 @@ class TenantRepository {
       }
       // If status is already an integer, use it directly
     }
+    
+    // Ensure created_at is never changed and updated_at is always current
+    delete updateData.created_at;
+    updateData.updated_at = new Date();
     
     await tenant.update(updateData);
     
