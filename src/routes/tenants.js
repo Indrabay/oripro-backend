@@ -33,6 +33,7 @@ function InitTenantRouter(TenantUseCase, TenantPaymentLogUsecase) {
       body('new_user.phone').optional(),
       body('new_user.gender').optional(),
       body('category_id').isInt().withMessage('category_id must be a valid integer'),
+      body('status').optional().isIn(['inactive', 'active', 'pending', 'expired', 'terminated', 'blacklisted', '0', '1', '2', '3', '4', '5']).withMessage('status must be one of: inactive, active, pending, expired, terminated, blacklisted, or 0, 1, 2, 3, 4, 5'),
     ],
     async (req, res) => {
     try {
@@ -59,13 +60,14 @@ function InitTenantRouter(TenantUseCase, TenantPaymentLogUsecase) {
         category_id,
         user_id,
         new_user,
+        status,
       } = req.body;
       
       console.log("TenantRouter.createTenant - extracted user_id:", user_id);
       console.log("TenantRouter.createTenant - extracted new_user:", new_user);
 
       const tenant = await TenantUseCase.createTenant({
-        name, tenant_identifications, contract_documents, contract_begin_at, unit_ids, rent_duration, rent_duration_unit, payment_term, rent_price, down_payment, deposit, user_id, new_user, category_id,createdBy: req.auth.userId
+        name, tenant_identifications, contract_documents, contract_begin_at, unit_ids, rent_duration, rent_duration_unit, payment_term, rent_price, down_payment, deposit, user_id, new_user, category_id, status, createdBy: req.auth.userId
       }, {userId: req.auth.userId, log: req.log});
       res.status(201).json(createResponse(tenant, "success", 201));
     } catch (err) {

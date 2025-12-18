@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { compressUploadedImages } = require('../middleware/imageCompressor');
+const { getUploadUrl } = require('../services/baseUrl');
 
 function InitUploadRouter() {
   const router = Router();

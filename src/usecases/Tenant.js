@@ -6,6 +6,7 @@ const {
   DurationUnit,
   DurationUnitStr,
   TenantStatusIntToStr,
+  TenantStatusStrToInt,
 } = require("../models/Tenant");
 const { AttachmentType } = require("../models/TenantAttachment");
 const { transformImageUrls } = require('../services/baseUrl');
@@ -120,7 +121,7 @@ class TenantUseCase {
           down_payment: data.down_payment || null,
           deposit: data.deposit || null,
           category_id: data.category_id || null,
-          status: 2, // pending
+          status: this.getTenantStatusInt(data.status) || 2, // Default to pending (2) if not provided
         };
         const tenant = await this.tenantRepository.create(
           createTenantData,
@@ -345,6 +346,37 @@ class TenantUseCase {
 
   generateCode() {
     return `${PrefixTenant}-${moment().local().format("DDMMYYYYHHmmss")}`;
+  }
+
+  /**
+   * Convert tenant status from string or integer to integer
+   * @param {string|number|undefined} status - Status value (string like 'active' or integer like 1)
+   * @returns {number|undefined} Integer status value or undefined if invalid/not provided
+   */
+  getTenantStatusInt(status) {
+    if (status === undefined || status === null) {
+      return undefined;
+    }
+    
+    if (typeof status === 'number') {
+      // Validate integer status (0-5)
+      if (status >= 0 && status <= 5) {
+        return status;
+      }
+      return undefined;
+    }
+    
+    if (typeof status === 'string') {
+      // Try to parse as integer first
+      const parsedInt = parseInt(status, 10);
+      if (!isNaN(parsedInt) && parsedInt >= 0 && parsedInt <= 5) {
+        return parsedInt;
+      }
+      // Try to convert from string status
+      return TenantStatusStrToInt[status];
+    }
+    
+    return undefined;
   }
 
   async getTenantById(id, ctx) {

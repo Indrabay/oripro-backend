@@ -47,7 +47,9 @@ async function compressImage(filePath, options = {}) {
   } = options;
 
   try {
-    const metadata = await sharp(filePath).metadata();
+    // Read the image file first
+    const imageBuffer = await sharp(filePath).toBuffer();
+    const metadata = await sharp(imageBuffer).metadata();
     
     // Determine output format
     let outputFormat = format || metadata.format;
@@ -63,8 +65,8 @@ async function compressImage(filePath, options = {}) {
       height = Math.round(height * ratio);
     }
     
-    // Prepare sharp pipeline
-    let pipeline = sharp(filePath)
+    // Prepare sharp pipeline from buffer
+    let pipeline = sharp(imageBuffer)
       .resize(width, height, {
         fit: 'inside',
         withoutEnlargement: true
@@ -86,13 +88,13 @@ async function compressImage(filePath, options = {}) {
       pipeline = pipeline.gif();
     }
     
-    // Get output path (same file, overwrite)
-    const outputPath = filePath;
+    // Compress to buffer first, then write to file
+    const compressedBuffer = await pipeline.toBuffer();
     
-    // Compress and save
-    await pipeline.toFile(outputPath);
+    // Write the compressed buffer back to the original file
+    await fs.promises.writeFile(filePath, compressedBuffer);
     
-    return outputPath;
+    return filePath;
   } catch (error) {
     console.error('Error compressing image:', error);
     // If compression fails, return original path
