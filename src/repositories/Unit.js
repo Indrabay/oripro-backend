@@ -229,6 +229,12 @@ class UnitRepository {
       // If status is already an integer, use it directly
     }
     
+    // Remove created_at from update data to prevent it from being changed
+    delete data.created_at;
+    
+    // Always update updated_at to current timestamp
+    data.updated_at = new Date();
+    
     ctx.log?.info({ unit_id: id, data_to_update: data, transaction: !!ctx.transaction }, "UnitRepository.update - calling unit.update");
     const updatedUnit = await unit.update(data, { transaction: ctx.transaction });
     

@@ -28,6 +28,7 @@ function uploadMiddleware(req, res, next) {
   const uploadHandler = upload.fields([
     { name: 'photos', maxCount: 10 },
     { name: 'sketch', maxCount: 1 },
+    { name: 'sketches', maxCount: 10 },
     { name: 'file', maxCount: 10 }
   ]);
 

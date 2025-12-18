@@ -12,6 +12,14 @@ class AssetAttachmentRepistory {
       where: { asset_id: assetID }
     })
   }
+
+  async delete(id, ctx = {}) {
+    const options = { where: { id } };
+    if (ctx.transaction) {
+      options.transaction = ctx.transaction;
+    }
+    return this.assetAttachmentModel.destroy(options);
+  }
 };
 
 module.exports = AssetAttachmentRepistory;

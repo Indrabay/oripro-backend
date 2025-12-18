@@ -24,7 +24,7 @@ function InitAssetRouter(AssetUsecase) {
 
   router.get("/", async (req, res) => {
     try {
-      let { name, asset_type, order, limit, offset } = req.query;
+      let { name, asset_type, status, order, limit, offset } = req.query;
       if (!limit) limit = 10;
       if (!offset) offset = 0;
 
@@ -33,6 +33,7 @@ function InitAssetRouter(AssetUsecase) {
         {
           name,
           asset_type,
+          status,
           order,
           limit,
           offset,
@@ -69,6 +70,7 @@ function InitAssetRouter(AssetUsecase) {
 
   router.put(
     "/:id",
+    uploadMiddleware,
     [
       param("id").isString().notEmpty(),
       body("name").optional().isString(),
@@ -82,12 +84,83 @@ function InitAssetRouter(AssetUsecase) {
     ],
     async (req, res) => {
       req.log?.info({ id: req.params.id }, "route_assets_update");
-      const updated = await AssetUsecase.updateAsset(req.params.id, req.body, {
-        requestId: req.requestId,
-        log: req.log,
-        roleName: req.auth.roleName,
-        userID: req.auth.userId,
-      });
+      
+      // Handle file uploads
+      let photos = [];
+      let sketches = [];
+      
+      if (req.files) {
+        const host = req.protocol + '://' + req.get('host');
+        
+        // Handle photos
+        if (req.files.photos && req.files.photos.length > 0) {
+          req.files.photos.forEach((file) => {
+            const relativePath = file.path.split('uploads')[1].replace(/\\/g, '/');
+            const urlPath = `${host}/uploads${relativePath}`;
+            photos.push(urlPath);
+          });
+        }
+        
+        // Handle sketches (frontend sends "sketches" plural, but middleware might use "sketch" singular)
+        if (req.files.sketches && req.files.sketches.length > 0) {
+          req.files.sketches.forEach((file) => {
+            const relativePath = file.path.split('uploads')[1].replace(/\\/g, '/');
+            const urlPath = `${host}/uploads${relativePath}`;
+            sketches.push(urlPath);
+          });
+        } else if (req.files.sketch && req.files.sketch.length > 0) {
+          // Fallback to singular "sketch" for backward compatibility
+          const file = req.files.sketch[0];
+          const relativePath = file.path.split('uploads')[1].replace(/\\/g, '/');
+          const urlPath = `${host}/uploads${relativePath}`;
+          sketches.push(urlPath);
+        }
+      }
+      
+      // Get existing photos and sketches from request body (sent as arrays)
+      // Only include these if they were explicitly sent in the request
+      const updateData = { ...req.body };
+      
+      // Only process photos/sketches if files were uploaded OR existing_* fields were explicitly sent
+      const hasPhotoFiles = req.files && req.files.photos && req.files.photos.length > 0;
+      const hasSketchFiles = req.files && ((req.files.sketches && req.files.sketches.length > 0) || 
+                                           (req.files.sketch && req.files.sketch.length > 0));
+      
+      // Check if existing_photos/existing_sketches were explicitly sent (not just undefined)
+      // Use 'in' operator which is safer than hasOwnProperty
+      const hasExistingPhotos = req.body && 'existing_photos' in req.body;
+      const hasExistingSketches = req.body && 'existing_sketches' in req.body;
+      
+      if (hasPhotoFiles || hasExistingPhotos) {
+        const existingPhotos = hasExistingPhotos 
+          ? (Array.isArray(req.body.existing_photos) 
+              ? req.body.existing_photos 
+              : (req.body.existing_photos ? [req.body.existing_photos] : []))
+          : undefined;
+        updateData.photos = photos;
+        updateData.existing_photos = existingPhotos;
+      }
+      
+      if (hasSketchFiles || hasExistingSketches) {
+        const existingSketches = hasExistingSketches
+          ? (Array.isArray(req.body.existing_sketches) 
+              ? req.body.existing_sketches 
+              : (req.body.existing_sketches ? [req.body.existing_sketches] : []))
+          : undefined;
+        updateData.sketches = sketches;
+        updateData.existing_sketches = existingSketches;
+      }
+      
+      const updated = await AssetUsecase.updateAsset(
+        req.params.id, 
+        updateData,
+        {
+          requestId: req.requestId,
+          log: req.log,
+          roleName: req.auth.roleName,
+          userID: req.auth.userId,
+        }
+      );
       if (!updated)
         return res.status(404).json(createResponse(null, "not found", 404));
       if (updated === "forbidden")

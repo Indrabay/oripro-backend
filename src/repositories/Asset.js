@@ -107,6 +107,23 @@ class AssetRepository {
     if (queryParams.asset_type) {
       whereQuery.where.asset_type = queryParams.asset_type
     }
+
+    if (queryParams.status !== undefined && queryParams.status !== null && queryParams.status !== '') {
+      // Convert string status to integer if needed
+      let statusInt = queryParams.status;
+      if (typeof queryParams.status === 'string') {
+        const { AssetStatusStrToInt } = require('../models/Asset');
+        statusInt = AssetStatusStrToInt[queryParams.status];
+        if (statusInt === undefined) {
+          // If string doesn't match, try parsing as integer
+          statusInt = parseInt(queryParams.status, 10);
+          if (isNaN(statusInt)) {
+            throw new Error(`Invalid status: ${queryParams.status}`);
+          }
+        }
+      }
+      whereQuery.where.status = statusInt;
+    }
     if (queryParams.limit) {
       whereQuery.limit = parseInt(queryParams.limit);
     }
