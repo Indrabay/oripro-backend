@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const { body, validationResult, param, query } = require('express-validator');
 const { authMiddleware, ensureRole } = require('../middleware/auth');
+const { createResponse } = require('../services/response');
 
 function InitTaskGroupRouter(taskGroupUsecase) {
   const router = Router();
@@ -10,7 +11,13 @@ function InitTaskGroupRouter(taskGroupUsecase) {
   router.get(
     '/',
     [
-      query('is_active').optional().isBoolean().withMessage('is_active must be a boolean')
+      query('is_active').optional().isBoolean().withMessage('is_active must be a boolean'),
+      query('name').optional().isString().trim().withMessage('name must be a string'),
+      query('start_time').optional().matches(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/).withMessage('start_time must be in HH:mm format'),
+      query('end_time').optional().matches(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/).withMessage('end_time must be in HH:mm format'),
+      query('order').optional().isIn(['newest', 'oldest', 'a-z', 'z-a']).withMessage('order must be one of: newest, oldest, a-z, z-a'),
+      query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('limit must be between 1 and 100'),
+      query('offset').optional().isInt({ min: 0 }).withMessage('offset must be a non-negative integer'),
     ],
     async (req, res) => {
       const errors = validationResult(req);
@@ -22,13 +29,37 @@ function InitTaskGroupRouter(taskGroupUsecase) {
         if (req.query.is_active !== undefined) {
           filter.is_active = req.query.is_active === 'true';
         }
+        if (req.query.name) {
+          filter.name = req.query.name;
+        }
+        if (req.query.start_time) {
+          filter.start_time = req.query.start_time;
+        }
+        if (req.query.end_time) {
+          filter.end_time = req.query.end_time;
+        }
+        if (req.query.order) {
+          filter.order = req.query.order;
+        }
+        if (req.query.limit) {
+          filter.limit = parseInt(req.query.limit);
+        }
+        if (req.query.offset) {
+          filter.offset = parseInt(req.query.offset);
+        }
         
-        const taskGroups = await taskGroupUsecase.listAllTaskGroups(filter, {
+        const result = await taskGroupUsecase.listAllTaskGroups(filter, {
           requestId: req.requestId,
           log: req.log,
           userId: req.auth?.userId,
         });
-        return res.json(taskGroups);
+        // Extract pagination from result and pass to createResponse
+        const pagination = result.total !== undefined ? {
+          total: result.total,
+          limit: result.limit || filter.limit || 10,
+          offset: result.offset || filter.offset || 0
+        } : {};
+        return res.status(200).json(createResponse(result, "success", 200, true, pagination));
       } catch (error) {
         req.log?.error({ error: error.message, stack: error.stack }, 'route_task_groups_list_error');
         return res.status(500).json({

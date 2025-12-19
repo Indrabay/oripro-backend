@@ -62,6 +62,15 @@ function InitTaskRouter(taskUsecase) {
       if (req.query.name) {
         filters.name = req.query.name;
       }
+      if (req.query.parent_task_id) {
+        filters.parent_task_id = parseInt(req.query.parent_task_id);
+      }
+      if (req.query.child_task_id) {
+        filters.child_task_id = parseInt(req.query.child_task_id);
+      }
+      if (req.query.order) {
+        filters.order = req.query.order;
+      }
       if (req.query.limit) {
         filters.limit = parseInt(req.query.limit);
       }
@@ -256,6 +265,9 @@ function InitTaskRouter(taskUsecase) {
     query("role_id").optional().isInt().withMessage("role_id must be an integer"),
     query("asset_id").optional().isUUID().withMessage("asset_id must be a valid UUID"),
     query("name").optional().isString().trim(),
+    query("parent_task_id").optional().isInt().withMessage("parent_task_id must be an integer"),
+    query("child_task_id").optional().isInt().withMessage("child_task_id must be an integer"),
+    query("order").optional().isIn(['newest', 'oldest', 'a-z', 'z-a']).withMessage("order must be one of: newest, oldest, a-z, z-a"),
     query("limit").optional().isInt({ min: 1, max: 100 }).withMessage("limit must be between 1 and 100"),
     query("offset").optional().isInt({ min: 0 }).withMessage("offset must be a non-negative integer"),
   ];

@@ -90,7 +90,13 @@ function InitScanInfoRouter(scanInfoUsecase) {
         userId: req.auth?.userId,
         log: req.log,
       });
-      return res.status(200).json(createResponse(result, "success", 200));
+      // Extract pagination from result and pass to createResponse
+      const pagination = result.total !== undefined ? {
+        total: result.total,
+        limit: result.limit || req.query.limit || 10,
+        offset: result.offset || req.query.offset || 0
+      } : {};
+      return res.status(200).json(createResponse(result, "success", 200, true, pagination));
     } catch (error) {
       req.log?.error(error, "ScanInfoRouter.listScanInfos");
       return res
@@ -210,7 +216,11 @@ function InitScanInfoRouter(scanInfoUsecase) {
     query("offset").isInt().optional(),
     query("asset_id").isUUID().optional(),
     query("scan_code").isString().optional(),
-    query("order").isIn(['oldest', 'newest', 'a-z', 'z-a', 'asset-a-z', 'asset-z-a', 'user-a-z', 'user-z-a']).optional(),
+    query("user_id").isUUID().optional().withMessage("user_id must be a valid UUID"),
+    query("created_by").isUUID().optional().withMessage("created_by must be a valid UUID"),
+    query("start_date").optional().matches(/^\d{4}-\d{2}-\d{2}$/).withMessage("start_date must be in YYYY-MM-DD format"),
+    query("end_date").optional().matches(/^\d{4}-\d{2}-\d{2}$/).withMessage("end_date must be in YYYY-MM-DD format"),
+    query("order").isIn(['newest', 'oldest', 'a-z', 'z-a', 'asset-a-z', 'asset-z-a', 'user-a-z', 'user-z-a']).optional(),
   ];
 
   const updateScanInfoParam = [

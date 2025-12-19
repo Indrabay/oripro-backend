@@ -404,7 +404,11 @@ class TaskUsecase {
       
       return {
         tasks: cleanedTasks,
-        total: result.total
+        total: result.total,
+        limit: result.limit,
+        offset: result.offset,
+        totalPages: result.totalPages,
+        currentPage: result.currentPage
       };
     } catch (error) {
       ctx.log?.error(

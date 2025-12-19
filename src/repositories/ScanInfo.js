@@ -87,18 +87,40 @@ class ScanInfoRepository {
   async listAll(queryParams = {}, ctx = {}) {
     try {
       ctx.log?.info(queryParams, 'ScanInfoRepository.listAll');
-      let whereQuery = {};
+      const { Op } = require('sequelize');
       
       // Build where clause for filtering
-      if (queryParams.asset_id || queryParams.scan_code) {
-        whereQuery.where = {};
-        if (queryParams.asset_id) {
-          whereQuery.where.asset_id = queryParams.asset_id;
+      const whereClause = {};
+      
+      if (queryParams.asset_id) {
+        whereClause.asset_id = queryParams.asset_id;
+      }
+      if (queryParams.scan_code) {
+        whereClause.scan_code = {
+          [Op.iLike]: `%${queryParams.scan_code}%`
+        };
+      }
+      if (queryParams.user_id || queryParams.created_by) {
+        // Support both user_id and created_by for consistency
+        whereClause.created_by = queryParams.user_id || queryParams.created_by;
+      }
+      
+      // Date range filtering
+      if (queryParams.start_date || queryParams.end_date) {
+        whereClause.created_at = {};
+        if (queryParams.start_date) {
+          // Start of day for start_date
+          whereClause.created_at[Op.gte] = new Date(queryParams.start_date + 'T00:00:00.000Z');
         }
-        if (queryParams.scan_code) {
-          whereQuery.where.scan_code = queryParams.scan_code;
+        if (queryParams.end_date) {
+          // End of day for end_date
+          whereClause.created_at[Op.lte] = new Date(queryParams.end_date + 'T23:59:59.999Z');
         }
       }
+
+      const whereQuery = {
+        where: whereClause
+      };
 
       // Handle pagination
       if (queryParams.limit) {
@@ -108,15 +130,15 @@ class ScanInfoRepository {
         whereQuery.offset = parseInt(queryParams.offset);
       }
 
-      // Handle ordering
+      // Handle ordering - sama seperti asset (menggunakan updated_at untuk newest/oldest)
       let order;
       if (queryParams.order) {
         switch (queryParams.order) {
           case "oldest":
-            order = [["created_at", "ASC"]];
+            order = [["updated_at", "ASC"]];
             break;
           case "newest":
-            order = [["created_at", "DESC"]];
+            order = [["updated_at", "DESC"]];
             break;
           case "a-z":
             order = [["scan_code", "ASC"]];
@@ -145,12 +167,12 @@ class ScanInfoRepository {
             ];
             break;
           default:
-            order = [["created_at", "DESC"]];
+            order = [["updated_at", "DESC"]];
             break;
         }
         whereQuery.order = order;
       } else {
-        whereQuery.order = [["created_at", "DESC"]];
+        whereQuery.order = [["updated_at", "DESC"]];
       }
 
       // Include related models
@@ -174,9 +196,19 @@ class ScanInfoRepository {
 
       const { rows, count } = await this.scanInfoModel.findAndCountAll(whereQuery);
 
+      // Calculate pagination metadata
+      const limit = queryParams.limit ? parseInt(queryParams.limit) : null;
+      const offset = queryParams.offset ? parseInt(queryParams.offset) : 0;
+      const totalPages = limit ? Math.ceil(count / limit) : 1;
+      const currentPage = limit ? Math.floor(offset / limit) + 1 : 1;
+
       return {
         scanInfos: rows.map(si => si.toJSON()),
         total: count,
+        limit: limit,
+        offset: offset,
+        totalPages: totalPages,
+        currentPage: currentPage
       };
     } catch (error) {
       ctx.log?.error({ queryParams, error }, 'ScanInfoRepository.listAll_error');

@@ -157,6 +157,54 @@ class TaskRepository {
         };
       }
 
+      // Filter by parent_task_id - find all child tasks that have this parent
+      if (filters.parent_task_id) {
+        const childRelations = await this.taskParentModel.findAll({
+          where: { parent_task_id: filters.parent_task_id },
+          attributes: ['child_task_id']
+        });
+        const childTaskIds = childRelations.map(rel => rel.child_task_id);
+        ctx.log?.info({ parent_task_id: filters.parent_task_id, childTaskIds }, "TaskRepository.findAll - found child tasks by parent");
+        
+        if (childTaskIds.length > 0) {
+          // If we already have taskIdsToInclude from task_group_id filter, intersect them
+          if (taskIdsToInclude !== null) {
+            taskIdsToInclude = taskIdsToInclude.filter(id => childTaskIds.includes(id));
+          } else {
+            taskIdsToInclude = childTaskIds;
+          }
+          whereClause.id = { [Op.in]: taskIdsToInclude };
+        } else {
+          // No child tasks found, return empty result
+          taskIdsToInclude = [];
+          whereClause.id = { [Op.in]: [] };
+        }
+      }
+
+      // Filter by child_task_id - find all parent tasks of this child
+      if (filters.child_task_id) {
+        const parentRelations = await this.taskParentModel.findAll({
+          where: { child_task_id: filters.child_task_id },
+          attributes: ['parent_task_id']
+        });
+        const parentTaskIds = parentRelations.map(rel => rel.parent_task_id);
+        ctx.log?.info({ child_task_id: filters.child_task_id, parentTaskIds }, "TaskRepository.findAll - found parent tasks by child");
+        
+        if (parentTaskIds.length > 0) {
+          // If we already have taskIdsToInclude from other filters, intersect them
+          if (taskIdsToInclude !== null) {
+            taskIdsToInclude = taskIdsToInclude.filter(id => parentTaskIds.includes(id));
+          } else {
+            taskIdsToInclude = parentTaskIds;
+          }
+          whereClause.id = { [Op.in]: taskIdsToInclude };
+        } else {
+          // No parent tasks found, return empty result
+          taskIdsToInclude = [];
+          whereClause.id = { [Op.in]: [] };
+        }
+      }
+
       const queryOptions = {
         where: whereClause,
         include: [
@@ -182,8 +230,32 @@ class TaskRepository {
             required: false
           }
         ],
-        order: [['id', 'ASC']]
       };
+
+      // Handle ordering - sama seperti asset
+      let order;
+      if (filters.order) {
+        switch (filters.order) {
+          case "oldest":
+            order = [["updated_at", "ASC"]];
+            break;
+          case "newest":
+            order = [["updated_at", "DESC"]];
+            break;
+          case "a-z":
+            order = [["name", "ASC"]];
+            break;
+          case "z-a":
+            order = [["name", "DESC"]];
+            break;
+          default:
+            order = [["id", "ASC"]];
+            break;
+        }
+        queryOptions.order = order;
+      } else {
+        queryOptions.order = [["id", "ASC"]];
+      }
 
       // Add pagination if provided
       if (filters.limit) {
@@ -213,9 +285,19 @@ class TaskRepository {
         return taskJson;
       }));
 
+      // Calculate pagination metadata
+      const limit = filters.limit ? parseInt(filters.limit) : null;
+      const offset = filters.offset ? parseInt(filters.offset) : 0;
+      const totalPages = limit ? Math.ceil(count / limit) : 1;
+      const currentPage = limit ? Math.floor(offset / limit) + 1 : 1;
+
       return {
         tasks,
-        total: count
+        total: count,
+        limit: limit,
+        offset: offset,
+        totalPages: totalPages,
+        currentPage: currentPage
       };
     } catch (error) {
       ctx.log?.error({ filters, error }, "TaskRepository.findAll_error");

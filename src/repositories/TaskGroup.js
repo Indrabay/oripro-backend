@@ -35,11 +35,79 @@ class TaskGroupRepository {
   async findAll(filter = {}, ctx = {}) {
     try {
       ctx.log?.info({ filter }, 'TaskGroupRepository.findAll');
-      const taskGroups = await this.taskGroupModel.findAll({
-        where: filter,
-        order: [['created_at', 'DESC']],
-      });
-      return taskGroups.map(tg => tg.toJSON());
+      const { Op } = require('sequelize');
+      
+      const whereClause = {};
+      
+      // Build where clause for filtering
+      if (filter.is_active !== undefined) {
+        whereClause.is_active = filter.is_active;
+      }
+      if (filter.name) {
+        whereClause.name = {
+          [Op.iLike]: `%${filter.name}%`
+        };
+      }
+      if (filter.start_time) {
+        whereClause.start_time = filter.start_time;
+      }
+      if (filter.end_time) {
+        whereClause.end_time = filter.end_time;
+      }
+
+      const queryOptions = {
+        where: whereClause,
+      };
+
+      // Handle ordering - sama seperti asset
+      let order;
+      if (filter.order) {
+        switch (filter.order) {
+          case "oldest":
+            order = [["updated_at", "ASC"]];
+            break;
+          case "newest":
+            order = [["updated_at", "DESC"]];
+            break;
+          case "a-z":
+            order = [["name", "ASC"]];
+            break;
+          case "z-a":
+            order = [["name", "DESC"]];
+            break;
+          default:
+            order = [["created_at", "DESC"]];
+            break;
+        }
+        queryOptions.order = order;
+      } else {
+        queryOptions.order = [["created_at", "DESC"]];
+      }
+
+      // Add pagination if provided
+      if (filter.limit) {
+        queryOptions.limit = parseInt(filter.limit);
+      }
+      if (filter.offset) {
+        queryOptions.offset = parseInt(filter.offset);
+      }
+
+      const { count, rows } = await this.taskGroupModel.findAndCountAll(queryOptions);
+      
+      // Calculate pagination metadata
+      const limit = filter.limit ? parseInt(filter.limit) : null;
+      const offset = filter.offset ? parseInt(filter.offset) : 0;
+      const totalPages = limit ? Math.ceil(count / limit) : 1;
+      const currentPage = limit ? Math.floor(offset / limit) + 1 : 1;
+
+      return {
+        taskGroups: rows.map(tg => tg.toJSON()),
+        total: count,
+        limit: limit,
+        offset: offset,
+        totalPages: totalPages,
+        currentPage: currentPage
+      };
     } catch (error) {
       ctx.log?.error({ filter, error }, 'TaskGroupRepository.findAll_error');
       throw error;
