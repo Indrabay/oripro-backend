@@ -675,25 +675,45 @@ class UserTaskRepository {
           },
         });
 
-        // Filter task groups where current time is within start_time and end_time
+        // Filter task groups where current time is within 1 hour before OR after start_time
+        // (0-60 minutes before or after start_time)
         const matchingTaskGroups = allTaskGroups.filter(tg => {
           const tgJson = tg.toJSON();
           const [startH, startM] = tgJson.start_time.split(':').map(Number);
-          const [endH, endM] = tgJson.end_time.split(':').map(Number);
           const [currentH, currentM] = currentTime.split(':').map(Number);
           
           const startMinutes = startH * 60 + startM;
-          const endMinutes = endH * 60 + endM;
           const currentMinutes = currentH * 60 + currentM;
 
-          // Handle time ranges that span midnight (e.g., 22:00 to 06:00)
-          if (endMinutes < startMinutes) {
-            // Range spans midnight
-            return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
+          // Calculate time difference in minutes for "before" case
+          let timeDiffBeforeMinutes;
+          if (currentMinutes <= startMinutes) {
+            // Current time is before start_time on the same day
+            timeDiffBeforeMinutes = startMinutes - currentMinutes;
           } else {
-            // Normal range within same day
-            return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+            // Current time is after start_time, check if it's before start_time tomorrow
+            // (e.g., current 23:00, start 07:00 -> 8 hours = 480 minutes)
+            timeDiffBeforeMinutes = (24 * 60) - currentMinutes + startMinutes;
           }
+
+          // Calculate time difference in minutes for "after" case
+          let timeDiffAfterMinutes;
+          if (currentMinutes >= startMinutes) {
+            // Current time is after start_time on the same day
+            timeDiffAfterMinutes = currentMinutes - startMinutes;
+          } else {
+            // Current time is before start_time, check if it's after start_time yesterday
+            // (e.g., current 06:00, start 19:00 -> check if it's after yesterday's 19:00)
+            // This means we're in the early morning, and the shift started yesterday
+            timeDiffAfterMinutes = (24 * 60) - startMinutes + currentMinutes;
+          }
+
+          // Check if current time is within 1 hour (0-60 minutes) before OR after start_time
+          // This gives a 1-hour window for task generation both before and after shift start
+          const isWithinBeforeWindow = timeDiffBeforeMinutes >= 0 && timeDiffBeforeMinutes <= 60;
+          const isWithinAfterWindow = timeDiffAfterMinutes >= 0 && timeDiffAfterMinutes <= 60;
+          
+          return isWithinBeforeWindow || isWithinAfterWindow;
         });
 
         const matchingTaskGroupIds = matchingTaskGroups.map(tg => tg.toJSON().id);
@@ -727,7 +747,9 @@ class UserTaskRepository {
         const taskIdsToCheck = tasksToCheck.map(t => t.id);
         
         if (taskIdsToCheck.length > 0) {
-          // Calculate the start of the current shift based on task group times
+          // Since we're generating tasks 1 hour before shift starts, we need to check
+          // if tasks have already been generated for the upcoming shift
+          // Calculate the start of the upcoming shift based on task group times
           const firstTaskGroup = matchingTaskGroups[0].toJSON();
           const [startH, startM] = firstTaskGroup.start_time.split(':').map(Number);
           const startMinutes = startH * 60 + startM;
@@ -735,60 +757,44 @@ class UserTaskRepository {
           const [endH, endM] = firstTaskGroup.end_time.split(':').map(Number);
           const endMinutes = endH * 60 + endM;
           
-          // Determine the start and end of the current shift period
+          // Determine the start and end of the upcoming shift period
+          // (the shift that's about to start, since we're generating 1 hour before)
           let shiftStart, shiftEnd;
           
-          // Check if shift spans midnight (e.g., 19:00 to 04:00)
+          // Since current time is before start_time (we're 1 hour before), the upcoming shift starts today
           if (endMinutes < startMinutes) {
-            // Shift spans midnight
-            if (currentMinutes >= startMinutes) {
-              // We're in the early part (e.g., 19:00-23:59), shift started today, ends tomorrow
-              shiftStart = now.clone().startOf('day').add(startMinutes, 'minutes');
-              shiftEnd = now.clone().add(1, 'day').startOf('day').add(endMinutes, 'minutes');
-            } else {
-              // We're in the late part (e.g., 00:00-04:00), shift started yesterday, ends today
-              shiftStart = now.clone().subtract(1, 'day').startOf('day').add(startMinutes, 'minutes');
-              shiftEnd = now.clone().startOf('day').add(endMinutes, 'minutes');
-            }
+            // Shift spans midnight (e.g., 19:00 to 04:00)
+            // If we're generating before start_time, the shift starts today and ends tomorrow
+            shiftStart = now.clone().startOf('day').add(startMinutes, 'minutes');
+            shiftEnd = now.clone().add(1, 'day').startOf('day').add(endMinutes, 'minutes');
           } else {
             // Normal shift within same day
-            if (currentMinutes >= startMinutes) {
-              // Shift already started today
-              shiftStart = now.clone().startOf('day').add(startMinutes, 'minutes');
-              shiftEnd = now.clone().startOf('day').add(endMinutes, 'minutes');
-            } else {
-              // Shift hasn't started yet today (shouldn't happen as we only generate during matching time)
-              // But handle edge case - shift started yesterday
-              shiftStart = now.clone().subtract(1, 'day').startOf('day').add(startMinutes, 'minutes');
-              shiftEnd = now.clone().subtract(1, 'day').startOf('day').add(endMinutes, 'minutes');
-            }
+            // Shift starts today
+            shiftStart = now.clone().startOf('day').add(startMinutes, 'minutes');
+            shiftEnd = now.clone().startOf('day').add(endMinutes, 'minutes');
           }
           
-          // Check if we're still within the current shift period
-          // If current time has passed shiftEnd, it's a new shift period and we should allow generation
-          const isWithinCurrentShift = (now.isAfter(shiftStart) || now.isSame(shiftStart)) && now.isBefore(shiftEnd);
+          // Check if tasks were already generated for this upcoming shift
+          // We check for tasks created in a window around the shift start time
+          // (from 2 hours before shift start to shift end, to catch any early generation)
+          const checkWindowStart = shiftStart.clone().subtract(2, 'hours');
+          const checkWindowEnd = shiftEnd.clone();
           
-          if (isWithinCurrentShift) {
-            // We're still within the current shift period - check if tasks were already generated
-            const existingUserTasks = await this.userTaskModel.findAll({
-              where: {
-                user_id: userId,
-                task_id: { [Op.in]: taskIdsToCheck },
-                created_at: {
-                  [Op.between]: [shiftStart.toDate(), shiftEnd.toDate()]
-                }
-              },
-              limit: 1,
-              transaction: t
-            });
-            
-            if (existingUserTasks.length > 0) {
-              ctx.log?.info({ userId, matchingTaskGroupIds, shiftStart: shiftStart.format(), shiftEnd: shiftEnd.format(), currentTime: now.format() }, 'User tasks already generated for this task group time range');
-              throw new Error('User tasks have already been generated for this task group time range');
-            }
-          } else {
-            // We're past the shift end or before shift start - it's a new shift period, allow generation
-            ctx.log?.info({ userId, matchingTaskGroupIds, shiftStart: shiftStart.format(), shiftEnd: shiftEnd.format(), currentTime: now.format() }, 'New shift period detected, allowing generation');
+          const existingUserTasks = await this.userTaskModel.findAll({
+            where: {
+              user_id: userId,
+              task_id: { [Op.in]: taskIdsToCheck },
+              created_at: {
+                [Op.between]: [checkWindowStart.toDate(), checkWindowEnd.toDate()]
+              }
+            },
+            limit: 1,
+            transaction: t
+          });
+          
+          if (existingUserTasks.length > 0) {
+            ctx.log?.info({ userId, matchingTaskGroupIds, shiftStart: shiftStart.format(), shiftEnd: shiftEnd.format(), currentTime: now.format() }, 'User tasks already generated for this upcoming task group time range');
+            throw new Error('User tasks have already been generated for this task group time range');
           }
         }
         
