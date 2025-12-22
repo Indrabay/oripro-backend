@@ -54,6 +54,10 @@ Task.init({
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
   },
+  updated_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
 }, {
   sequelize,
   modelName: 'Task',

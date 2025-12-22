@@ -128,8 +128,74 @@ class TaskUsecase {
         if (data.is_all_times !== undefined) updateData.is_all_times = data.is_all_times;
         if (data.task_group_id !== undefined) updateData.task_group_id = data.task_group_id;
         updateData.updated_by = ctx.userId;
+        updateData.updated_at = new Date(); // Update the updated_at timestamp
 
         const task = await this.taskRepository.update(id, updateData, ctx, t);
+
+        // Handle schedule updates (days and times)
+        if (data.days !== undefined || data.times !== undefined) {
+          // Delete existing schedules
+          await this.taskScheduleRepository.deleteByTaskId(id, ctx, t);
+          
+          // Create new schedules based on provided days and times
+          const baseScheduleData = {
+            task_id: id,
+            created_by: ctx.userId,
+          };
+
+          if (data.days && data.days.length > 0) {
+            // Days provided: use current logic
+            for (let i = 0; i < data.days.length; i++) {
+              const dayOfWeek = data.days[i];
+              if (data.times && data.times.length > 0) {
+                for (let j = 0; j < data.times.length; j++) {
+                  const taskScheduleData = {
+                    ...baseScheduleData,
+                    day_of_week: dayOfWeek,
+                    time: data.times[j],
+                  };
+                  await this.taskScheduleRepository.create(
+                    t,
+                    taskScheduleData,
+                    ctx
+                  );
+                }
+              } else {
+                const taskScheduleData = {
+                  ...baseScheduleData,
+                  day_of_week: dayOfWeek,
+                };
+                await this.taskScheduleRepository.create(
+                  t,
+                  taskScheduleData,
+                  ctx
+                );
+              }
+            }
+          } else {
+            // Days empty: create for all times with day_of_week = "all"
+            if (data.times && data.times.length > 0) {
+              for (let j = 0; j < data.times.length; j++) {
+                const taskScheduleData = {
+                  ...baseScheduleData,
+                  day_of_week: "all",
+                  time: data.times[j],
+                };
+                await this.taskScheduleRepository.create(
+                  t,
+                  taskScheduleData,
+                  ctx
+                );
+              }
+            } else {
+              const taskScheduleData = {
+                ...baseScheduleData,
+                day_of_week: "all",
+              };
+              await this.taskScheduleRepository.create(t, taskScheduleData, ctx);
+            }
+          }
+        }
 
         // Handle multiple parent tasks using junction table
         if (data.parent_task_ids !== undefined) {
@@ -192,6 +258,9 @@ class TaskUsecase {
           throw logError;
         }
 
+        // Get schedules using taskScheduleRepository (within transaction to see newly created schedules)
+        const schedules = await this.taskScheduleRepository.findByTaskId(id, ctx, t);
+        
         // Convert task to plain JSON to avoid circular references in response
         const taskJson = task.toJSON ? task.toJSON() : task;
         // Clean up associations to plain objects to avoid circular references
@@ -208,8 +277,26 @@ class TaskUsecase {
           is_all_times: taskJson.is_all_times,
           task_group_id: taskJson.task_group_id,
           created_by: taskJson.created_by,
+          created_at: taskJson.created_at,
+          updated_at: taskJson.updated_at,
           parent_task_ids: taskJson.parent_task_ids || []
         };
+        
+        // Process schedules to extract days and times arrays
+        const daysSet = new Set();
+        const timesSet = new Set();
+        
+        schedules.forEach(schedule => {
+          if (schedule.day_of_week && schedule.day_of_week !== 'all') {
+            daysSet.add(schedule.day_of_week);
+          }
+          if (schedule.time) {
+            timesSet.add(schedule.time);
+          }
+        });
+        
+        cleanedTask.days = Array.from(daysSet).sort();
+        cleanedTask.times = Array.from(timesSet).sort();
         
         // Extract only needed fields from associations to avoid circular references
         if (taskJson.createdBy) {
@@ -364,6 +451,8 @@ class TaskUsecase {
           is_all_times: task.is_all_times,
           task_group_id: task.task_group_id,
           created_by: task.created_by,
+          created_at: task.created_at,
+          updated_at: task.updated_at,
           parent_task_ids: task.parent_task_ids || []
         };
         

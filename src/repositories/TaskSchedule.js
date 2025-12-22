@@ -14,12 +14,13 @@ class TaskScheduleRepository {
     }
   }
 
-  async findByTaskId(taskId, ctx = {}) {
+  async findByTaskId(taskId, ctx = {}, tx = null) {
     try {
       ctx.log?.info({ taskId }, "TaskScheduleRepository.findByTaskId");
       const schedules = await this.taskScheduleModel.findAll({
         where: { task_id: taskId },
-        order: [['day_of_week', 'ASC'], ['time', 'ASC']]
+        order: [['day_of_week', 'ASC'], ['time', 'ASC']],
+        transaction: tx
       });
       return schedules.map(schedule => schedule.toJSON ? schedule.toJSON() : schedule);
     } catch (error) {
