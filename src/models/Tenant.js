@@ -88,6 +88,12 @@ Tenant.init({
     defaultValue: 2, // pending
     comment: 'Status: 0=inactive, 1=active, 2=pending, 3=expired, 4=terminated, 5=blacklisted'
   },
+  payment_status: {
+    type: DataTypes.ENUM('paid', 'scheduled', 'reminder_needed', 'overdue'),
+    allowNull: true,
+    defaultValue: 'scheduled',
+    comment: 'Payment status: paid, scheduled, reminder_needed, overdue'
+  },
   code: {
     type: DataTypes.STRING,
     allowNull: false,

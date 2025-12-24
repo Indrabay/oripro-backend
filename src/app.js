@@ -22,6 +22,7 @@ const { InitScanInfoRouter } = require('./routes/scanInfos');
 const { InitTaskGroupRouter } = require('./routes/taskGroups');
 const { InitComplaintReportRouter } = require('./routes/complaintReports');
 const { InitInternalRouter } = require('./routes/internal');
+const { InitSettingsRouter } = require('./routes/settings');
 const { requestContext } = require('./middleware/requestContext');
 const { metricsMiddleware, metricsHandler } = require('./services/metrics');
 
@@ -60,6 +61,7 @@ const ScanInfoRepository = require('./repositories/ScanInfo');
 const UserTaskRepository = require('./repositories/UserTask');
 const UserTaskEvidenceRepository = require('./repositories/UserTaskEvidence');
 const TenantPaymentLogRepository = require('./repositories/TenantPaymentLog');
+const SettingsRepository = require('./repositories/Settings');
 
 // define usecase module
 const authUc = require('./usecases/Auth');
@@ -77,6 +79,7 @@ const scanInfoUc = require('./usecases/ScanInfo');
 const complaintReportUc = require('./usecases/ComplaintReport');
 const attendanceUc = require('./usecases/Attendance');
 const tenantPaymentLogUc = require('./usecases/TenantPaymentLog');
+const settingsUc = require('./usecases/Settings');
 
 // define models database
 const {User} = require('./models/User');
@@ -112,6 +115,7 @@ const modelTaskParent = require('./models/TaskParent');
 const modelUserTask = require('./models/UserTask');
 const modelUserTaskEvidence = require('./models/UserTaskEvidence');
 const { TenantPaymentLog: modelTenantPaymentLog } = require('./models/TenantPaymentLog');
+const Settings = require('./models/Settings');
 
 // initialize repository
 const userRepository = new UserRepository(User, modelRole);
@@ -146,6 +150,7 @@ const scanInfoRepository = new ScanInfoRepository(modelScanInfo, User, Asset);
 const userTaskRepository = new UserTaskRepository(modelUserTask, User, modelTask, modelUserTaskEvidence, modelTaskSchedule, modelTaskGroup, modelTaskParent);
 const userTaskEvidenceRepository = new UserTaskEvidenceRepository(modelUserTaskEvidence, modelUserTask);
 const tenantPaymentLogRepository = new TenantPaymentLogRepository(modelTenantPaymentLog, Tenant, User);
+const settingsRepository = new SettingsRepository(Settings);
 
 // Setup model associations
 const models = {
@@ -182,6 +187,7 @@ const models = {
   UserTask: modelUserTask,
   UserTaskEvidence: modelUserTaskEvidence,
   TenantPaymentLog: modelTenantPaymentLog,
+  Settings: Settings,
 };
 
 // Setup associations
@@ -220,6 +226,7 @@ const complaintReportUsecase = new complaintReportUc(complaintReportRepository, 
 const attendanceRepository = new AttendanceRepository();
 const attendanceUsecase = new attendanceUc(attendanceRepository);
 const tenantPaymentLogUsecase = new tenantPaymentLogUc(tenantPaymentLogRepository, tenantRepository);
+const settingsUsecase = new settingsUc(settingsRepository);
 const DashboardUsecase = require('./usecases/Dashboard');
 const dashboardUsecase = new DashboardUsecase(
   complaintReportRepository,
@@ -250,6 +257,7 @@ const userTaskRouter = require('./routes/userTasks').InitUserTaskRouter(userTask
 const { InitDashboardRouter } = require('./routes/dashboard');
 const dashboardRouter = InitDashboardRouter(dashboardUsecase);
 const internalRouter = InitInternalRouter({ tenantRepository, tenantPaymentLogRepository });
+const settingsRouter = InitSettingsRouter(settingsUsecase);
 
 // Middleware
 app.use(helmet());
@@ -412,6 +420,7 @@ app.use('/api/complaint-reports', complaintReportRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/attendances', attendanceRouter);
 app.use('/api/internal', internalRouter);
+app.use('/api/settings', settingsRouter);
 app.get('/metrics', metricsHandler);
 
 // 404 handler

@@ -185,17 +185,38 @@ class TenantRepository {
       // If status is already an integer, use it directly
     }
     
+    // Validate payment_status if provided (must be one of: 'paid', 'scheduled', 'reminder_needed', 'overdue')
+    if (updateData.payment_status !== undefined && updateData.payment_status !== null) {
+      const validPaymentStatuses = ['paid', 'scheduled', 'reminder_needed', 'overdue'];
+      if (!validPaymentStatuses.includes(updateData.payment_status)) {
+        throw new Error(`Invalid payment_status: ${updateData.payment_status}. Must be one of: ${validPaymentStatuses.join(', ')}`);
+      }
+    }
+    
     // Ensure created_at is never changed and updated_at is always current
     delete updateData.created_at;
     updateData.updated_at = new Date();
     
+    // Log the update data for debugging
+    if (updateData.payment_status) {
+      console.log(`[TenantRepository] Updating tenant ${id} payment_status to: ${updateData.payment_status}`);
+    }
+    
     await tenant.update(updateData);
+    
+    // Reload tenant to get the latest data
+    await tenant.reload();
     
     // Convert status back to string for response
     const tenantJson = tenant.toJSON();
     if (tenantJson.status !== undefined && tenantJson.status !== null) {
       const { TenantStatusIntToStr } = require('../models/Tenant');
       tenantJson.status = TenantStatusIntToStr[tenantJson.status] || tenantJson.status;
+    }
+    
+    // Log the result for debugging
+    if (updateData.payment_status) {
+      console.log(`[TenantRepository] Tenant ${id} payment_status after update: ${tenantJson.payment_status}`);
     }
     
     return tenantJson;

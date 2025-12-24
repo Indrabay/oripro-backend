@@ -3,6 +3,7 @@
 module.exports = {
   up: async (queryInterface, Sequelize) => {
     const menus = [
+      // Main Dashboard
       {
         id: 1,
         title: 'Dashboard',
@@ -14,6 +15,7 @@ module.exports = {
         created_at: new Date(),
         updated_at: new Date(),
       },
+      // Users Section
       {
         id: 2,
         title: 'Users',
@@ -47,6 +49,7 @@ module.exports = {
         created_at: new Date(),
         updated_at: new Date(),
       },
+      // Asset & Unit
       {
         id: 5,
         title: 'Asset',
@@ -69,39 +72,19 @@ module.exports = {
         created_at: new Date(),
         updated_at: new Date(),
       },
-      {
-        id: 7,
-        title: 'Tenants',
-        url: '/tenants',
-        icon: 'Building2',
-        parent_id: null,
-        order: 5,
-        is_active: true,
-        created_at: new Date(),
-        updated_at: new Date(),
-      },
-      {
-        id: 8,
-        title: 'Worker',
-        url: '/worker',
-        icon: 'UsersRound',
-        parent_id: null,
-        order: 5,
-        is_active: true,
-        created_at: new Date(),
-        updated_at: new Date(),
-      },
+      // Setting Section (Parent)
       {
         id: 9,
         title: 'Setting',
         url: '#',
         icon: 'Settings',
         parent_id: null,
-        order: 6,
+        order: 5,
         is_active: true,
         created_at: new Date(),
         updated_at: new Date(),
       },
+      // Setting Children
       {
         id: 10,
         title: 'Menu Management',
@@ -153,6 +136,149 @@ module.exports = {
         icon: 'Bell',
         parent_id: 9,
         order: 5,
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      {
+        id: 25,
+        title: 'Setting Options',
+        url: '/setting-options',
+        icon: 'Settings',
+        parent_id: 9,
+        order: 6,
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      // Task Group
+      {
+        id: 15,
+        title: 'Task Group',
+        url: '/task-groups',
+        icon: null,
+        parent_id: null,
+        order: 6,
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      // Scan Info
+      {
+        id: 16,
+        title: 'Scan Info',
+        url: '/scan-info',
+        icon: null,
+        parent_id: null,
+        order: 7,
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      // Dashboard Tenant
+      {
+        id: 17,
+        title: 'Dashboard',
+        url: '/dashboard-tenant',
+        icon: 'House',
+        parent_id: null,
+        order: 8,
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      // Dashboard Worker
+      {
+        id: 18,
+        title: 'Dashboard',
+        url: '/dashboard-worker',
+        icon: 'House',
+        parent_id: null,
+        order: 9,
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      // Tenants
+      {
+        id: 7,
+        title: 'Tenants',
+        url: '/tenants',
+        icon: 'FileText',
+        parent_id: null,
+        order: 10,
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      // Find & Report
+      {
+        id: 19,
+        title: 'Find & Report',
+        url: '/complaint-reports',
+        icon: 'CircleAlert',
+        parent_id: null,
+        order: 11,
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      // Attendance
+      {
+        id: 20,
+        title: 'Attendance',
+        url: '/attendance',
+        icon: 'UserRoundCheck',
+        parent_id: null,
+        order: 12,
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      // Cleaning Program
+      {
+        id: 21,
+        title: 'Cleaning Program',
+        url: '/cleaning-program',
+        icon: 'ListChecks',
+        parent_id: null,
+        order: 13,
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      // Security Guard
+      {
+        id: 22,
+        title: 'Security Guard',
+        url: '/security-guard',
+        icon: 'ListChecks',
+        parent_id: null,
+        order: 14,
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      // Task Menu (Parent)
+      {
+        id: 23,
+        title: 'Task Menu',
+        url: '#',
+        icon: 'StickyNote',
+        parent_id: null,
+        order: 15,
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      // Task (Child of Task Menu)
+      {
+        id: 24,
+        title: 'Task',
+        url: '/task-parents',
+        icon: null,
+        parent_id: 23,
+        order: 1,
         is_active: true,
         created_at: new Date(),
         updated_at: new Date(),

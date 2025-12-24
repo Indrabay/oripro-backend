@@ -1,5 +1,6 @@
 const sequelize = require("../models/sequelize");
 const { PaymentLogStatusIntToStr } = require("../models/TenantPaymentLog");
+const { updateTenantPaymentStatus } = require("../routes/internal");
 
 class TenantPaymentLogUsecase {
   constructor(tenantPaymentLogRepository, tenantRepository) {
@@ -74,6 +75,45 @@ class TenantPaymentLogUsecase {
         ...updateData,
         updated_by: ctx.userId,
       }, ctx);
+      
+      // Check if payment was marked as paid
+      const isPaid = updatedPaymentLog.status === 1 || updateData.status === 1;
+      
+      ctx.log?.info({ 
+        paymentLogId: id, 
+        tenantId: paymentLog.tenant_id, 
+        isPaid, 
+        updatedStatus: updatedPaymentLog.status 
+      }, "Payment log updated, checking if should update tenant status");
+      
+      // Update tenant payment_status when payment log changes
+      if (paymentLog.tenant_id) {
+        try {
+          // Add a small delay to ensure database transaction is committed
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Update payment_status for this tenant
+          const newStatus = await updateTenantPaymentStatus({
+            tenantRepository: this.tenantRepository,
+            tenantPaymentLogRepository: this.tenantPaymentLogRepository,
+            tenantId: paymentLog.tenant_id,
+            ctx
+          });
+          
+          ctx.log?.info({ 
+            tenantId: paymentLog.tenant_id, 
+            newPaymentStatus: newStatus,
+            paymentWasPaid: isPaid
+          }, "Updated tenant payment_status");
+        } catch (err) {
+          ctx.log?.error({ 
+            tenantId: paymentLog.tenant_id, 
+            error: err.message,
+            stack: err.stack 
+          }, "Failed to update tenant payment_status");
+          // Don't throw error, just log it
+        }
+      }
       
       // Convert status back to string for response
       if (updatedPaymentLog && updatedPaymentLog.status !== undefined) {

@@ -204,6 +204,41 @@ class TenantPaymentLogRepository {
       throw error;
     }
   }
+
+  /**
+   * Find all unique tenant IDs that have unpaid payment logs
+   * @param {Object} ctx - Context object with log
+   * @returns {Promise<string[]>} - Array of unique tenant IDs
+   */
+  async findTenantIdsWithUnpaidLogs(ctx = {}) {
+    try {
+      ctx.log?.info({}, 'TenantPaymentLogRepository.findTenantIdsWithUnpaidLogs');
+
+      const rows = await this.tenantPaymentLogModel.findAll({
+        where: {
+          status: 0, // unpaid
+        },
+        attributes: ['tenant_id'],
+        raw: true,
+      });
+
+      // Get unique tenant IDs using Set
+      const tenantIdsSet = new Set();
+      for (const row of rows) {
+        if (row.tenant_id) {
+          tenantIdsSet.add(row.tenant_id);
+        }
+      }
+
+      const tenantIds = Array.from(tenantIdsSet);
+
+      ctx.log?.info({ count: tenantIds.length }, 'TenantPaymentLogRepository.findTenantIdsWithUnpaidLogs: Found tenant IDs');
+      return tenantIds;
+    } catch (error) {
+      ctx.log?.error({ error }, 'TenantPaymentLogRepository.findTenantIdsWithUnpaidLogs_error');
+      throw error;
+    }
+  }
 }
 
 module.exports = TenantPaymentLogRepository;
