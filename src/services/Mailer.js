@@ -5,7 +5,8 @@ const path = require('path');
 // Helper function to get logo file path
 function getLogoPath() {
   // __dirname is src/services, so go up 2 levels to project root, then into icon folder
-  return path.join(__dirname, '../../icon/peruri-property.jpeg');
+  const logoFileName = process.env.LOGO_FILENAME || 'peruri-property.jpeg';
+  return path.join(__dirname, '../../icon', logoFileName);
 }
 
 // Helper function to get logo attachment config
@@ -15,11 +16,17 @@ function getLogoAttachment(cid) {
     console.warn('Logo file not found at:', logoPath);
     return null;
   }
+  const logoFileName = process.env.LOGO_FILENAME || 'peruri-property.jpeg';
+  const fileExtension = path.extname(logoFileName).toLowerCase();
+  const contentType = fileExtension === '.png' ? 'image/png' : 
+                      fileExtension === '.svg' ? 'image/svg+xml' : 
+                      'image/jpeg';
+  
   return {
-    filename: 'logo.jpeg',
+    filename: logoFileName,
     path: logoPath,
     cid: cid,
-    contentType: 'image/jpeg'
+    contentType: contentType
   };
 }
 
