@@ -212,8 +212,41 @@ function InitInternalRouter({ tenantRepository, tenantPaymentLogRepository }) {
       const now = new Date();
 
       try {
-        // Fetch due-soon logs (unpaid + deadline within range)
-        const paymentLogs = await tenantPaymentLogRepository.findUnpaidDueSoon({ days, now }, { log: req.log });
+        // Fetch all unpaid logs (we'll filter by payment_term reminder window)
+        // Use a large window (365 days) to get all unpaid logs, then filter by payment_term
+        const allUnpaidLogs = await tenantPaymentLogRepository.findUnpaidDueSoon({ days: 365, now }, { log: req.log });
+        
+        // Filter logs based on payment_term reminder window
+        const paymentLogs = [];
+        for (const pl of allUnpaidLogs) {
+          const tenant = pl.tenant || null;
+          const paymentTerm = tenant?.payment_term !== undefined && tenant?.payment_term !== null 
+            ? tenant.payment_term 
+            : 1; // Default to monthly
+          
+          const dl = pl.payment_deadline ? new Date(pl.payment_deadline) : null;
+          if (!dl || Number.isNaN(dl.getTime())) continue;
+          
+          // Calculate days until deadline
+          const daysUntilDeadline = Math.ceil((dl.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+          
+          // Check if reminder should be sent based on payment_term
+          let shouldRemind = false;
+          if (paymentTerm === 0) {
+            // Yearly: send reminder if deadline is within 3 months (90 days) or less
+            // We want to send it when we're at or past the 3-month mark before deadline
+            const threeMonthsInDays = 90;
+            shouldRemind = daysUntilDeadline <= threeMonthsInDays && daysUntilDeadline >= 0;
+          } else {
+            // Monthly: send reminder if deadline is within 7 days or less
+            shouldRemind = daysUntilDeadline <= 7 && daysUntilDeadline >= 0;
+          }
+          
+          if (shouldRemind) {
+            paymentLogs.push(pl);
+          }
+        }
+        
         let emailed = 0;
         let skippedNoEmail = 0;
         let updatedTenants = 0;

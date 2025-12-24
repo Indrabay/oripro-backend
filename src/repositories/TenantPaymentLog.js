@@ -184,7 +184,7 @@ class TenantPaymentLogRepository {
           {
             model: this.tenantModel,
             as: 'tenant',
-            attributes: ['id', 'name', 'code', 'user_id'],
+            attributes: ['id', 'name', 'code', 'user_id', 'payment_term'],
             include: [
               {
                 model: this.userModel,

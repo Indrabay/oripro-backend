@@ -79,7 +79,8 @@ class AuthUsecase {
     ctx.log?.info({ userId: user.id }, 'usecase_request_password_reset_token_created');
 
     const resetUrl = `${this.appBaseUrl.replace(/\/$/, '')}/auth/reset-password?token=${encodeURIComponent(tokenPlain)}&uid=${encodeURIComponent(user.id)}`;
-    await sendPasswordResetEmail({ to: user.email, resetUrl });
+    const userName = user.name || user.email.split('@')[0];
+    await sendPasswordResetEmail({ to: user.email, resetUrl, userName });
     ctx.log?.info({ userId: user.id }, 'usecase_request_password_reset_email_sent');
     return { ok: true };
   }
