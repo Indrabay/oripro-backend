@@ -1,3 +1,5 @@
+const { Op } = require('sequelize');
+
 class UserAccessMenuRepository {
   constructor(userModel, roleModel, roleMenuPermissionModel, menuModel) {
     this.userModel = userModel;
@@ -265,6 +267,77 @@ class UserAccessMenuRepository {
 
     } catch (error) {
       ctx.log?.error({ error: error.message, stack: error.stack }, 'repo_check_user_menu_access_error');
+      throw error;
+    }
+  }
+
+  async checkUserMenuAccessByUrl(userId, url, permission = 'can_view', ctx = {}) {
+    ctx.log?.info({ userId, url, permission }, 'repo_check_user_menu_access_by_url');
+    
+    try {
+      // Normalize URL - remove leading/trailing slashes and query params for matching
+      let normalizedUrl = url.replace(/^\/+|\/+$/g, '').split('?')[0];
+      
+      // Remove dynamic route segments (e.g., [id], [slug]) for matching
+      normalizedUrl = normalizedUrl.replace(/\/\[.*?\]/g, '');
+      
+      const urlVariations = [
+        normalizedUrl,
+        `/${normalizedUrl}`,
+        `${normalizedUrl}/`,
+        `/${normalizedUrl}/`
+      ];
+      
+      // Find menu by URL (exact match)
+      const menu = await this.menuModel.findOne({
+        where: {
+          url: {
+            [Op.or]: urlVariations
+          },
+          is_active: true
+        }
+      });
+
+      if (menu) {
+        // Check access for found menu
+        return await this.checkUserMenuAccess(userId, menu.id, permission, ctx);
+      }
+
+      // For nested routes (e.g., /users/edit/123), check parent route (e.g., /users)
+      // Split URL by '/' and try to find matching menu for each segment
+      const urlParts = normalizedUrl.split('/').filter(part => part.length > 0);
+      
+      // Try to find menu by matching URL segments from longest to shortest
+      for (let i = urlParts.length; i > 0; i--) {
+        const partialUrl = '/' + urlParts.slice(0, i).join('/');
+        const partialUrlVariations = [
+          partialUrl.replace(/^\/+|\/+$/g, ''),
+          partialUrl,
+          `${partialUrl}/`,
+          partialUrl.replace(/^\//, '')
+        ];
+
+        const menuByPath = await this.menuModel.findOne({
+          where: {
+            url: {
+              [Op.or]: partialUrlVariations
+            },
+            is_active: true
+          },
+          order: [['url', 'DESC']] // Get the most specific match
+        });
+
+        if (menuByPath) {
+          // Check access for found menu
+          return await this.checkUserMenuAccess(userId, menuByPath.id, permission, ctx);
+        }
+      }
+
+      ctx.log?.warn({ userId, url }, 'menu_not_found_by_url');
+      return false;
+
+    } catch (error) {
+      ctx.log?.error({ error: error.message, stack: error.stack }, 'repo_check_user_menu_access_by_url_error');
       throw error;
     }
   }

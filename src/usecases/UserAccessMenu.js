@@ -45,6 +45,20 @@ class UserAccessMenuUsecase {
     }
   }
 
+  async checkUserMenuAccessByUrl(userId, url, permission = 'can_view', ctx) {
+    ctx.log?.info({ userId, url, permission }, 'usecase_check_user_menu_access_by_url');
+    
+    try {
+      const hasAccess = await this.userAccessMenuRepository.checkUserMenuAccessByUrl(userId, url, permission, ctx);
+      
+      ctx.log?.info({ userId, url, permission, hasAccess }, 'usecase_check_user_menu_access_by_url_success');
+      return hasAccess;
+    } catch (error) {
+      ctx.log?.error({ error: error.message, stack: error.stack }, 'usecase_check_user_menu_access_by_url_error');
+      throw error;
+    }
+  }
+
   async getUserSidebarData(userId, ctx) {
     ctx.log?.info({ userId }, 'usecase_get_user_sidebar_data');
     

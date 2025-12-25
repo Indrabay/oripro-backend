@@ -87,6 +87,28 @@ function InitUserRouter(userUsecase, userAccessMenuUsecase) {
     }
   };
 
+  const checkMenuAccess = async (req, res) => {
+    req.log?.info({ userId: req.auth.userId, url: req.query.url }, "UserRouter.checkMenuAccess");
+    try {
+      const { url } = req.query;
+      if (!url) {
+        return res.status(400).json(createResponse(null, "URL parameter is required", 400));
+      }
+
+      const hasAccess = await userAccessMenuUsecase.checkUserMenuAccessByUrl(
+        req.auth.userId,
+        url,
+        'can_view',
+        { requestId: req.requestId, log: req.log }
+      );
+
+      return res.status(200).json(createResponse({ hasAccess }, "success", 200, true));
+    } catch (error) {
+      req.log?.error({ error: error.message }, "UserRouter.checkMenuAccess_error");
+      return res.status(500).json(createResponse(null, "Internal Server Error", 500));
+    }
+  };
+
   const getDetailUserParam = [param("id").isUUID().withMessage("ID must be a valid UUID")];
   const getDetailUser = async (req, res) => {
     const errors = validationResult(req);
@@ -302,6 +324,8 @@ function InitUserRouter(userUsecase, userAccessMenuUsecase) {
   router.get("/menus", getUserMenu);
   // GET /api/users/sidebar - Get user accessible sidebar
   router.get("/sidebar", getUserSidebar);
+  // GET /api/users/check-menu-access - Check if user has access to menu by URL
+  router.get("/check-menu-access", checkMenuAccess);
   // GET /api/users/:id/logs - Get user logs (must be before /:id route)
   router.get("/:id/logs", getUserLogParam, getUserLogs);
   // GET /api/users/:id/assets - Get user assets (must be before /:id route)
