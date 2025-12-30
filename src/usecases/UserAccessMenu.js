@@ -73,6 +73,10 @@ class UserAccessMenuUsecase {
             url: menu.url || "#",
             icon: menu.icon, // Frontend akan handle konversi string ke LucideIcon
             isActive: menu.is_active,
+            // Include permissions
+            can_add: menu.can_create || false,
+            can_edit: menu.can_update || false,
+            can_delete: menu.can_delete || false,
           };
           
           // Only add items if menu has children
@@ -80,7 +84,11 @@ class UserAccessMenuUsecase {
             sidebarItem.items = menu.children.map(child => ({
               title: child.title,
               url: child.url || "#",
-              circleColor: this.getCircleColor(child.title)
+              circleColor: this.getCircleColor(child.title),
+              // Include permissions for child items
+              can_add: child.can_create || false,
+              can_edit: child.can_update || false,
+              can_delete: child.can_delete || false,
             }));
           }
           
