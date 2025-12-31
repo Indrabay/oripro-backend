@@ -6,6 +6,22 @@ const {
   UserStatusStrToInt,
 } = require("../models/User");
 
+// Helper function to normalize Gmail addresses for comparison
+// Gmail treats addresses with/without dots as the same (e.g., k.indrabayu@gmail.com = kindrabayu@gmail.com)
+function normalizeEmailForComparison(email) {
+  if (!email || typeof email !== 'string') return email;
+  const parts = email.toLowerCase().split('@');
+  if (parts.length !== 2) return email;
+  const [localPart, domain] = parts;
+  // Only normalize Gmail addresses
+  if (domain === 'gmail.com' || domain === 'googlemail.com') {
+    // Remove dots from local part and remove anything after +
+    const normalizedLocal = localPart.split('+')[0].replace(/\./g, '');
+    return `${normalizedLocal}@${domain}`;
+  }
+  return email.toLowerCase();
+}
+
 class UserUsecase {
   constructor(userRepository, userLogRepository, userAssetRepository) {
     this.userRepository = userRepository;
@@ -119,12 +135,39 @@ class UserUsecase {
   async updateUser(id, data, ctx) {
     const user = await this.userRepository.findById(id, ctx);
     if (!user) return null;
-    if (data.email && data.email !== user.email) {
-      const existingUser = await this.userRepository.findByEmail(
-        data.email,
-        ctx
-      );
-      if (existingUser) return "exists";
+    
+    // Check for email duplicate only if email is provided and different from current
+    if (data.email !== undefined && data.email !== null && data.email !== '') {
+      // Normalize emails for comparison (Gmail addresses with/without dots are the same)
+      const normalizedNewEmail = normalizeEmailForComparison(data.email);
+      const normalizedCurrentEmail = normalizeEmailForComparison(user.email);
+      
+      // If normalized emails are the same, it's the same Gmail address - allow update
+      // Otherwise, check for duplicates
+      if (normalizedNewEmail !== normalizedCurrentEmail) {
+        // Check if the exact email exists
+        const existingUser = await this.userRepository.findByEmail(
+          data.email,
+          ctx
+        );
+        if (existingUser && existingUser.id !== user.id) {
+          return "exists";
+        }
+        
+        // Also check if a normalized version exists (for Gmail addresses)
+        // This prevents someone from registering with k.indrabayu@gmail.com 
+        // when kindrabayu@gmail.com already exists
+        if (normalizedNewEmail !== data.email.toLowerCase()) {
+          const existingNormalizedUser = await this.userRepository.findByEmail(
+            normalizedNewEmail,
+            ctx
+          );
+          if (existingNormalizedUser && existingNormalizedUser.id !== user.id) {
+            return "exists";
+          }
+        }
+      }
+      // If normalized emails are the same, allow the update (same Gmail address, different format)
     }
 
     if (data.gender) {
@@ -137,10 +180,17 @@ class UserUsecase {
 
     // Hash password if it's being updated
     const updateData = { ...data, updatedBy: ctx.userId };
+    
+    // Ensure email is included if provided (even if it's the same as current)
+    if (data.email !== undefined && data.email !== null && data.email !== '') {
+      updateData.email = data.email;
+    }
+    
     if (data.password) {
       updateData.password = await bcrypt.hash(data.password, 10);
     }
 
+    ctx.log?.info({ id, updateData: { ...updateData, password: updateData.password ? '[HIDDEN]' : undefined } }, "UserUsecase.updateUser - updateData");
     const updatedUser = await this.userRepository.update(id, updateData, ctx);
     if (!updatedUser) return null;
     if (data.assetIds && data.assetIds.length > 0) {

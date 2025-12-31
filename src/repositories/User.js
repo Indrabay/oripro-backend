@@ -1,4 +1,5 @@
 const { Op } = require("sequelize");
+const sequelize = require("../models/sequelize");
 const { UserGenderStrToInt, UserStatusStrToInt } = require("../models/User");
 
 class UserRepository {
@@ -171,10 +172,10 @@ class UserRepository {
           order = [["updated_at", "DESC"]];
           break;
         case "a-z":
-          order = [["name", "ASC"]];
+          order = [[sequelize.fn('LOWER', sequelize.col('users.name')), "ASC"]];
           break;
         case "z-a":
-          order = [["name", "DESC"]];
+          order = [[sequelize.fn('LOWER', sequelize.col('users.name')), "DESC"]];
           break;
         default:
           break;
@@ -278,8 +279,11 @@ class UserRepository {
       };
       
       // Only include fields that are explicitly provided in userData
-      if (userData.email !== undefined) {
+      if (userData.email !== undefined && userData.email !== null && userData.email !== '') {
         updateFields.email = userData.email;
+        ctx.log?.info({ userId, email: userData.email }, "repo_update_user - including email in update");
+      } else if (userData.email !== undefined) {
+        ctx.log?.warn({ userId, email: userData.email }, "repo_update_user - email is undefined/null/empty, skipping");
       }
       if (userData.password !== undefined) {
         updateFields.password = userData.password;
@@ -305,7 +309,10 @@ class UserRepository {
       
       await user.update(updateFields);
       
-      ctx.log?.debug({ userId, updateFields }, "repo_update_user_success");
+      // Reload the user to get fresh data from database
+      await user.reload();
+      
+      ctx.log?.debug({ userId, updateFields, updatedEmail: user.email }, "repo_update_user_success");
       return user.toJSON();
     } catch (error) {
       ctx.log?.error({ error: error.message, userId }, "repo_update_user_error");

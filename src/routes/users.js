@@ -187,7 +187,7 @@ function InitUserRouter(userUsecase, userAccessMenuUsecase) {
 
   const updateUserParam = [
     param("id").isUUID().withMessage("ID must be a valid UUID"),
-    body("email").optional().isEmail().normalizeEmail(),
+    body("email").optional().isEmail(),
     body("name").optional().isString().notEmpty(),
     body("gender").optional().isString().isIn(["male", "female"]),
     body("phone").optional().isString(),
