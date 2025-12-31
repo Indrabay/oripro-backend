@@ -62,6 +62,11 @@ UserTask.init({
     allowNull: true,
     comment: 'Reference to parent user task if this is a child task'
   },
+  time: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    comment: 'Schedule time from task_schedules (HH:mm format)'
+  },
   created_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,

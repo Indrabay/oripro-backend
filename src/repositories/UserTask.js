@@ -39,6 +39,7 @@ class UserTaskRepository {
         code: data.code || null,
         is_main_task: data.is_main_task !== undefined ? data.is_main_task : false,
         parent_user_task_id: data.parent_user_task_id || null,
+        time: data.time || null,
       }, { transaction: tx });
       return userTask.toJSON();
     } catch (error) {
@@ -174,47 +175,32 @@ class UserTaskRepository {
       ctx.log?.info({ userId, queryParams }, 'UserTaskRepository.findByUserId');
       const { limit = 10, offset = 0 } = queryParams;
       
-      // Get current time in Asia/Jakarta timezone to filter by task group time range
-      const now = moment().tz('Asia/Jakarta');
-      const currentTime = now.format('HH:mm');
-      
-      // Find task groups that match the current time
-      let matchingTaskGroupIds = [];
-      if (this.taskGroupModel) {
-        const allTaskGroups = await this.taskGroupModel.findAll({
-          where: {
-            is_active: true,
-          },
-        });
+      // Step 1: Get all user tasks from this user, ordered by created_at DESC to find the latest code
+      const allUserTasksForCode = await this.userTaskModel.findAll({
+        where: { user_id: userId },
+        order: [['created_at', 'DESC']],
+        limit: 1, // Just need the first one to get the code
+        attributes: ['code', 'created_at']
+      });
 
-        // Filter task groups where current time is within start_time and end_time
-        const matchingTaskGroups = allTaskGroups.filter(tg => {
-          const tgJson = tg.toJSON();
-          const [startH, startM] = tgJson.start_time.split(':').map(Number);
-          const [endH, endM] = tgJson.end_time.split(':').map(Number);
-          const [currentH, currentM] = currentTime.split(':').map(Number);
-          
-          const startMinutes = startH * 60 + startM;
-          const endMinutes = endH * 60 + endM;
-          const currentMinutes = currentH * 60 + currentM;
-
-          // Handle time ranges that span midnight (e.g., 22:00 to 06:00)
-          if (endMinutes < startMinutes) {
-            // Range spans midnight
-            return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
-          } else {
-            // Normal range within same day
-            return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
-          }
-        });
-
-        matchingTaskGroupIds = matchingTaskGroups.map(tg => tg.toJSON().id);
+      // Step 2: Get the latest code from the newest user task
+      let latestCode = null;
+      if (allUserTasksForCode.length > 0) {
+        const newestTask = allUserTasksForCode[0].toJSON();
+        latestCode = newestTask.code;
       }
-      
-      const whereClause = { user_id: userId };
 
-      // Get all user tasks (both main and child) for the user
-      // We'll filter by task_group later after we have the full data
+      ctx.log?.info({ 
+        userId, 
+        latestCode,
+        hasCode: !!latestCode
+      }, 'UserTaskRepository.findByUserId - Found latest code');
+
+      // Step 3: Get all user tasks filtered by the latest code (if found)
+      const whereClause = latestCode 
+        ? { user_id: userId, code: latestCode }
+        : { user_id: userId };
+
       const { rows, count } = await this.userTaskModel.findAndCountAll({
         where: whereClause,
         limit: parseInt(limit) * 10, // Increase limit to account for child tasks
@@ -224,7 +210,6 @@ class UserTaskRepository {
           {
             model: this.taskModel,
             as: 'task',
-            // attributes: ['id', 'name', 'duration', 'is_scan', 'scan_code', 'is_main_task', 'task_group_id'],
             required: false // Don't require task - some user_tasks might not have matching tasks
           },
           {
@@ -237,68 +222,15 @@ class UserTaskRepository {
 
       ctx.log?.info({ 
         userId, 
+        latestCode,
         rowsCount: rows.length, 
         totalCount: count,
         limit: parseInt(limit) * 10,
         offset: parseInt(offset)
-      }, 'UserTaskRepository.findByUserId - Initial query results');
+      }, 'UserTaskRepository.findByUserId - User tasks with latest code');
 
-      // Separate main tasks and child tasks
-      const mainTasksRows = [];
-      const childTasksRows = [];
-      const allUserTaskIds = new Set();
-      
-      rows.forEach(ut => {
-        const utJson = ut.toJSON();
-        allUserTaskIds.add(utJson.id);
-        
-        if (utJson.is_main_task) {
-          mainTasksRows.push(ut);
-        } else if (utJson.parent_user_task_id) {
-          childTasksRows.push(ut);
-        } else {
-          // Standalone task without parent or main flag, treat as main
-          mainTasksRows.push(ut);
-        }
-      });
-
-      // Filter main tasks by task_group
-      // If no task association exists, include the task (don't filter it out)
-      const filteredMainTasks = matchingTaskGroupIds.length > 0
-        ? mainTasksRows.filter(ut => {
-            const utJson = ut.toJSON();
-            const task = utJson.task;
-            // Include tasks without task associations, or tasks whose task_group_id matches
-            return !task || !task.task_group_id || matchingTaskGroupIds.includes(task.task_group_id);
-          })
-        : mainTasksRows;
-
-      ctx.log?.info({ 
-        matchingTaskGroupIdsCount: matchingTaskGroupIds.length,
-        mainTasksRowsCount: mainTasksRows.length,
-        filteredMainTasksCount: filteredMainTasks.length
-      }, 'UserTaskRepository.findByUserId - Task group filtering');
-
-      // Get IDs of filtered main tasks
-      const filteredMainTaskIds = new Set(filteredMainTasks.map(ut => ut.toJSON().id));
-
-      // Filter child tasks to only include those whose parents are in filteredMainTaskIds
-      const filteredChildTasks = childTasksRows.filter(ut => {
-        const utJson = ut.toJSON();
-        return filteredMainTaskIds.has(utJson.parent_user_task_id);
-      });
-
-      // Combine filtered main tasks and their child tasks
-      const allRows = [...filteredMainTasks, ...filteredChildTasks];
-
-      ctx.log?.info({ 
-        childTasksRowsCount: childTasksRows.length,
-        filteredChildTasksCount: filteredChildTasks.length,
-        allRowsCount: allRows.length
-      }, 'UserTaskRepository.findByUserId - After combining main and child tasks');
-
-      // Process user tasks to group child tasks under main tasks
-      const userTasksJson = allRows.map(ut => {
+      // Step 4: Process user tasks to group child tasks under main tasks
+      const userTasksJson = rows.map(ut => {
         const utJson = ut.toJSON();
         // Convert status from integer to string for response
         if (utJson.status !== undefined) {
@@ -307,83 +239,13 @@ class UserTaskRepository {
         return utJson;
       });
 
-      // Filter to only keep user tasks from the newest generation (code)
-      // Group by code and find the newest generation
-      const codeToTasksMap = new Map(); // Map code -> array of user tasks with that code
-      const codeToMaxDateMap = new Map(); // Map code -> max created_at for that code
-      const tasksWithoutCode = []; // Tasks without codes
-      
-      userTasksJson.forEach(userTask => {
-        if (!userTask.code) {
-          // If no code, include it separately
-          tasksWithoutCode.push(userTask);
-          return;
-        }
-        
-        if (!codeToTasksMap.has(userTask.code)) {
-          codeToTasksMap.set(userTask.code, []);
-          codeToMaxDateMap.set(userTask.code, null);
-        }
-        
-        codeToTasksMap.get(userTask.code).push(userTask);
-        
-        // Track the max created_at for this code
-        const userTaskDate = new Date(userTask.created_at);
-        const currentMax = codeToMaxDateMap.get(userTask.code);
-        if (!currentMax || userTaskDate > currentMax) {
-          codeToMaxDateMap.set(userTask.code, userTaskDate);
-        }
-      });
-
-      // Find the newest code (generation) - the one with the latest created_at
-      let newestCode = null;
-      let newestDate = null;
-      codeToMaxDateMap.forEach((maxDate, code) => {
-        if (!newestDate || maxDate > newestDate) {
-          newestDate = maxDate;
-          newestCode = code;
-        }
-      });
-
-      // Get all user tasks from the newest generation (code)
-      // If no codes exist, return all tasks (including those without codes)
-      let filteredUserTasks = [];
-      if (newestCode) {
-        filteredUserTasks = codeToTasksMap.get(newestCode) || [];
-      } else if (codeToTasksMap.size === 0) {
-        // No codes found at all, return all tasks including those without codes
-        filteredUserTasks = userTasksJson;
-      } else {
-        // Codes exist but couldn't determine newest, return all tasks with codes
-        codeToTasksMap.forEach((tasks) => {
-          filteredUserTasks.push(...tasks);
-        });
-      }
-      
-      // Include tasks without codes if we're not filtering by newest code
-      if (!newestCode && tasksWithoutCode.length > 0) {
-        filteredUserTasks.push(...tasksWithoutCode);
-      }
-
-      // Log for debugging
-      ctx.log?.info({ 
-        newestCode, 
-        codeToTasksMapSize: codeToTasksMap.size,
-        tasksWithoutCodeCount: tasksWithoutCode.length,
-        filteredTasksCount: filteredUserTasks.length,
-        mainTasksCount: filteredUserTasks.filter(ut => ut.is_main_task).length,
-        childTasksCount: filteredUserTasks.filter(ut => !ut.is_main_task && ut.parent_user_task_id).length,
-        allTaskIds: filteredUserTasks.map(ut => ut.id),
-        childTaskIds: filteredUserTasks.filter(ut => !ut.is_main_task).map(ut => ({ id: ut.id, parent_id: ut.parent_user_task_id }))
-      }, 'Filtered user tasks by newest code');
-
-      // Separate main tasks and child tasks using is_main_task and parent_user_task_id
+      // Step 5: Separate main tasks and child tasks
       const mainTasks = [];
       const childTasksMap = new Map(); // Map parent_user_task_id -> array of child user tasks
       const userTaskIdMap = new Map(); // Map user_task_id -> user_task for quick lookup
 
       // First pass: create maps and separate main/child tasks
-      filteredUserTasks.forEach(userTask => {
+      userTasksJson.forEach(userTask => {
         userTaskIdMap.set(userTask.id, userTask);
         
         if (userTask.is_main_task) {
@@ -419,16 +281,8 @@ class UserTaskRepository {
               parentUserTask.childTasks.push(childUt);
             }
           });
-          
-          // Log for debugging
-          ctx.log?.info({ 
-            parentUserTaskId, 
-            parentIsMain: parentUserTask.is_main_task,
-            childCount: parentUserTask.childTasks.length,
-            childTaskIds: childUserTasks.map(ct => ct.id)
-          }, 'Attached child tasks to parent');
         } else {
-          // Log warning if parent not found (shouldn't happen if all from same generation)
+          // Log warning if parent not found
           ctx.log?.warn({ 
             parentUserTaskId, 
             childTaskIds: childUserTasks.map(ct => ct.id),
@@ -438,7 +292,6 @@ class UserTaskRepository {
       });
       
       // Ensure all main tasks have childTasks array (even if empty)
-      // Also verify child tasks are properly attached
       mainTasks.forEach(mainTask => {
         if (!mainTask.childTasks) {
           mainTask.childTasks = [];
@@ -454,43 +307,11 @@ class UserTaskRepository {
             }
           });
         }
-        
-        ctx.log?.info({ 
-          mainTaskId: mainTask.id, 
-          childTasksCount: mainTask.childTasks.length,
-          childTaskIds: mainTask.childTasks.map(ct => ct.id)
-        }, 'Main task child tasks check');
       });
 
-      // Final verification: ensure child tasks are properly attached before building result
-      const finalMainTasks = mainTasks.map(mainTask => {
-        // Get child tasks from childTasksMap if they exist
-        if (childTasksMap.has(mainTask.id)) {
-          const childrenFromMap = childTasksMap.get(mainTask.id);
-          if (!mainTask.childTasks) {
-            mainTask.childTasks = [];
-          }
-          // Ensure all children are in the array
-          const existingIds = new Set(mainTask.childTasks.map(ct => ct.id));
-          childrenFromMap.forEach(childUt => {
-            if (!existingIds.has(childUt.id)) {
-              mainTask.childTasks.push(childUt);
-            }
-          });
-        }
-        return mainTask;
-      });
-
-      // Return array format: flat user task objects with sub_user_task array
-      const result = finalMainTasks.map(mainTask => {
-        // Use childTasks directly from the main task
+      // Step 6: Build result array format: flat user task objects with sub_user_task array
+      const result = mainTasks.map(mainTask => {
         const childTasks = mainTask.childTasks || [];
-        
-        ctx.log?.info({ 
-          mainTaskId: mainTask.id, 
-          childTasksCount: childTasks.length,
-          childTaskIds: childTasks.map(ct => ct.id)
-        }, 'Building result for main task');
         
         // Create a flat object with all main task properties
         const userTaskObj = {
@@ -504,6 +325,7 @@ class UserTaskRepository {
           code: mainTask.code,
           is_main_task: mainTask.is_main_task,
           parent_user_task_id: mainTask.parent_user_task_id,
+          time: mainTask.time,
           created_at: mainTask.created_at,
           updated_at: mainTask.updated_at,
           task: mainTask.task,
@@ -519,6 +341,7 @@ class UserTaskRepository {
             code: childTask.code,
             is_main_task: childTask.is_main_task,
             parent_user_task_id: childTask.parent_user_task_id,
+            time: childTask.time,
             created_at: childTask.created_at,
             updated_at: childTask.updated_at,
             task: childTask.task,
@@ -532,6 +355,14 @@ class UserTaskRepository {
 
       // Sort result by user_task_id
       result.sort((a, b) => a.user_task_id - b.user_task_id);
+
+      ctx.log?.info({ 
+        userId,
+        latestCode,
+        resultCount: result.length,
+        mainTasksCount: result.length,
+        totalChildTasksCount: result.reduce((sum, task) => sum + (task.sub_user_task?.length || 0), 0)
+      }, 'UserTaskRepository.findByUserId - Final result');
 
       return result;
     } catch (error) {
@@ -664,9 +495,14 @@ class UserTaskRepository {
         // Get current day and time in Asia/Jakarta timezone
         const now = moment().tz('Asia/Jakarta');
         const currentDay = now.day(); // 0 = Sunday, 1 = Monday, etc.
-        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-        const currentDayName = dayNames[currentDay];
+        const currentDayNumber = currentDay.toString(); // Convert to string to match varchar in database (0-6 or 'all')
         const currentTime = now.format('HH:mm');
+        
+        ctx.log?.info({ 
+          currentDay,
+          currentDayNumber,
+          currentTime
+        }, 'Current day and time for schedule matching');
         
         // Find task groups that match the current time
         const allTaskGroups = await this.taskGroupModel.findAll({
@@ -803,9 +639,14 @@ class UserTaskRepository {
           task_group_id: { [Op.in]: matchingTaskGroupIds }
         };
         
-        // Get all tasks with their schedules for today - ONLY from matching task groups
-        const tasks = await this.taskModel.findAll({
-          where: taskWhereClause,
+        // First, get all main tasks that belong to matching task groups (regardless of schedules)
+        // This ensures main tasks are included even if they don't have schedules
+        // Get schedules that match current day OR are 'all' - we need ALL matching schedules, not just one
+        const allMainTasks = await this.taskModel.findAll({
+          where: {
+            ...taskWhereClause,
+            is_main_task: true
+          },
           include: [
             {
               model: this.taskScheduleModel,
@@ -813,19 +654,78 @@ class UserTaskRepository {
               where: {
                 [Op.or]: [
                   { day_of_week: 'all' },
-                  { day_of_week: currentDayName }
+                  { day_of_week: currentDayNumber }
                 ]
               },
-              required: true
+              required: false // Make schedules optional - include main tasks even without schedules
+              // This will get ALL schedules that match today or are 'all', so a task with multiple times will get all of them
             }
           ],
           transaction: t
         });
+        
+        ctx.log?.info({ 
+          matchingTaskGroupIds,
+          currentDayNumber,
+          allMainTasksCount: allMainTasks.length,
+          allMainTaskIds: allMainTasks.map(t => {
+            const tJson = t.toJSON();
+            const schedules = tJson.schedules || [];
+            return {
+              id: t.id,
+              name: tJson.name,
+              task_group_id: tJson.task_group_id,
+              schedulesCount: schedules.length,
+              schedules: schedules.map(s => ({ 
+                id: s.id,
+                day_of_week: s.day_of_week, 
+                time: s.time,
+                task_id: s.task_id
+              }))
+            };
+          })
+        }, 'Found all main tasks from matching task groups with schedules');
 
-        // Get task IDs to find child tasks
+        // Get main task IDs to find their child tasks
+        const mainTaskIds = allMainTasks.map(t => t.id);
+        
+        // Determine which main tasks have child tasks
+        // This helps us include main tasks even if they don't have schedules
+        const mainTaskIdsWithChildren = new Set();
+        if (mainTaskIds.length > 0 && this.taskParentModel) {
+          const parentRelationsForChildren = await this.taskParentModel.findAll({
+            where: { parent_task_id: { [Op.in]: mainTaskIds } },
+            attributes: ['parent_task_id'],
+            transaction: t
+          });
+          parentRelationsForChildren.forEach(rel => {
+            mainTaskIdsWithChildren.add(rel.parent_task_id);
+          });
+        }
+
+        // Include ALL main tasks from matching task groups
+        // Schedules determine when to create user tasks, not whether to create them
+        const tasks = allMainTasks;
+        
+        ctx.log?.info({ 
+          allMainTasksCount: allMainTasks.length,
+          tasksCount: tasks.length,
+          mainTaskIdsWithChildren: Array.from(mainTaskIdsWithChildren),
+          taskIds: tasks.map(t => {
+            const tJson = t.toJSON();
+            return {
+              id: t.id,
+              name: tJson.name,
+              hasSchedule: (tJson.schedules && tJson.schedules.length > 0),
+              hasChildTasks: mainTaskIdsWithChildren.has(t.id)
+            };
+          })
+        }, 'Including all main tasks from matching task groups');
+
+        // Get task IDs from filtered main tasks to find their child tasks
         const taskIds = tasks.map(t => t.id);
         
-        // Find all child tasks that belong to matching task groups
+        // Find all child tasks that have these filtered main tasks as parents
         // Use TaskParent junction table to find child tasks with multiple parents
         let childTasks = [];
         if (taskIds.length > 0 && this.taskParentModel) {
@@ -854,7 +754,7 @@ class UserTaskRepository {
                   where: {
                     [Op.or]: [
                       { day_of_week: 'all' },
-                      { day_of_week: currentDayName }
+                      { day_of_week: currentDayNumber }
                     ]
                   },
                   required: false // Make schedules optional for child tasks
@@ -889,9 +789,49 @@ class UserTaskRepository {
         // Collect user tasks for each scheduled task (parent and child)
         // Only process parent tasks (from 'tasks' array), not child tasks
         // Child tasks will be created when processing their parent tasks
+        ctx.log?.info({ 
+          tasksToProcessCount: tasks.length,
+          taskIds: tasks.map(t => {
+            const tJson = t.toJSON();
+            return {
+              id: t.id,
+              name: tJson.name,
+              schedulesCount: tJson.schedules?.length || 0
+            };
+          })
+        }, 'Processing tasks to create user tasks');
+        
         for (const task of tasks) {
           const taskJson = task.toJSON();
-          const taskSchedules = task.schedules || [];
+          let taskSchedules = task.schedules || [];
+          
+          // If schedules are empty, try to reload them
+          if (taskSchedules.length === 0 && this.taskScheduleModel) {
+            const reloadedSchedules = await this.taskScheduleModel.findAll({
+              where: {
+                task_id: task.id,
+                [Op.or]: [
+                  { day_of_week: 'all' },
+                  { day_of_week: currentDayNumber }
+                ]
+              },
+              transaction: t
+            });
+            taskSchedules = reloadedSchedules.map(s => s.toJSON ? s.toJSON() : s);
+            ctx.log?.info({ 
+              taskId: task.id,
+              reloadedSchedulesCount: taskSchedules.length,
+              schedules: taskSchedules.map(s => ({ day_of_week: s.day_of_week, time: s.time }))
+            }, 'Reloaded schedules for task');
+          }
+          
+          ctx.log?.info({ 
+            taskId: task.id,
+            taskName: taskJson.name,
+            schedulesCount: taskSchedules.length,
+            schedules: taskSchedules.map(s => ({ day_of_week: s.day_of_week, time: s.time })),
+            isMainTask: taskJson.is_main_task
+          }, 'Processing task');
           
           // Get task with related task_parents (child tasks)
           let childTaskIds = [];
@@ -902,14 +842,35 @@ class UserTaskRepository {
               transaction: t
             });
             childTaskIds = parentRelations.map(rel => rel.child_task_id);
+            ctx.log?.info({ 
+              taskId: task.id,
+              childTaskIds
+            }, 'Found child tasks for main task');
           }
           
           // If task has schedules, collect user task data for each schedule
           // If task has no schedules (e.g., child task without own schedules), collect one user task anyway
           if (taskSchedules.length > 0) {
+            ctx.log?.info({ 
+              taskId: task.id,
+              taskName: taskJson.name,
+              schedulesCount: taskSchedules.length,
+              schedules: taskSchedules.map(s => {
+                const sJson = s.toJSON ? s.toJSON() : s;
+                return { day_of_week: sJson.day_of_week, time: sJson.time };
+              })
+            }, 'Processing task with schedules - will create one user task per schedule');
+            
             for (const schedule of taskSchedules) {
               const scheduleJson = schedule.toJSON ? schedule.toJSON() : schedule;
               const scheduleTime = scheduleJson.time || null;
+              
+              ctx.log?.info({ 
+                taskId: task.id,
+                taskName: taskJson.name,
+                scheduleTime,
+                dayOfWeek: scheduleJson.day_of_week
+              }, 'Creating user task for schedule');
               
               // Find the task group for this task
               const taskGroup = matchingTaskGroups.find(tg => tg.id === taskJson.task_group_id);
@@ -927,7 +888,8 @@ class UserTaskRepository {
                   status: 'pending',
                   code: generationCode,
                   is_main_task: isMainTask,
-                  parent_user_task_id: null
+                  parent_user_task_id: null,
+                  time: scheduleTime
                 },
                 sortData: {
                   is_main_task: taskJson.is_main_task || false,
@@ -975,7 +937,8 @@ class UserTaskRepository {
                       status: 'pending',
                       code: generationCode,
                       is_main_task: false,
-                      parent_user_task_id: null // Will be set when creating
+                      parent_user_task_id: null, // Will be set when creating
+                      time: scheduleTime // Same schedule time as parent
                     },
                     sortData: {
                       is_main_task: childTaskJson.is_main_task || false,
@@ -992,10 +955,25 @@ class UserTaskRepository {
                 }
               }
               
+              ctx.log?.info({ 
+                taskId: task.id,
+                taskName: taskJson.name,
+                scheduleTime,
+                childTasksCount: mainTaskItem.childTasks.length,
+                userTaskDataToCreateCount: userTaskDataToCreate.length + 1
+              }, 'Adding main task item to userTaskDataToCreate');
+              
               userTaskDataToCreate.push(mainTaskItem);
             }
           } else {
-            // Task has no schedules (e.g., child task) - collect user task data anyway
+            // Task has no schedules - collect user task data anyway
+            ctx.log?.info({ 
+              taskId: task.id,
+              taskName: taskJson.name,
+              isMainTask: taskJson.is_main_task,
+              childTaskIdsCount: childTaskIds.length
+            }, 'Processing task without schedules');
+            
             const taskGroup = matchingTaskGroups.find(tg => tg.id === taskJson.task_group_id);
             const taskGroupJson = taskGroup ? taskGroup.toJSON() : null;
             
@@ -1011,7 +989,8 @@ class UserTaskRepository {
                 status: 'pending',
                 code: generationCode,
                 is_main_task: isMainTask,
-                parent_user_task_id: null
+                parent_user_task_id: null,
+                time: null // No schedule time for tasks without schedules
               },
               sortData: {
                 is_main_task: taskJson.is_main_task || false,
@@ -1059,7 +1038,8 @@ class UserTaskRepository {
                     status: 'pending',
                     code: generationCode,
                     is_main_task: false,
-                    parent_user_task_id: null // Will be set when creating
+                    parent_user_task_id: null, // Will be set when creating
+                    time: null // No schedule time for tasks without schedules
                   },
                   sortData: {
                     is_main_task: childTaskJson.is_main_task || false,
@@ -1084,6 +1064,17 @@ class UserTaskRepository {
         // userTaskDataToCreate only contains main tasks (each with their childTasks array populated)
         // So we can use all items directly
         const mainTaskDataToCreate = userTaskDataToCreate;
+        
+        // Log summary of what will be created
+        const summary = mainTaskDataToCreate.map(item => ({
+          taskId: item.userTaskData.task_id,
+          scheduleTime: item.sortData.scheduleTime,
+          childTasksCount: item.childTasks?.length || 0
+        }));
+        ctx.log?.info({ 
+          totalMainTasksToCreate: mainTaskDataToCreate.length,
+          summary
+        }, 'Summary of user tasks to be created - one per schedule');
         
         // Ensure all items have childTasks array initialized
         mainTaskDataToCreate.forEach(item => {
