@@ -215,7 +215,7 @@ class TenantUseCase {
             }
             
             numberOfLogs = rentDurationInYears; // 1 payment per year
-            paymentAmount = tenant.rent_price - tenant.down_payment / numberOfLogs;
+            paymentAmount = (tenant.rent_price - tenant.down_payment) / numberOfLogs;
             dateUnit = 'years';
           } else if (paymentTerm === 1) {
             // Payment term is in months

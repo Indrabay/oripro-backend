@@ -175,11 +175,15 @@ class UserRepository {
           break;
         case "z-a":
           order = [["name", "DESC"]];
+          break;
         default:
           break;
       }
 
       whereQuery.order = order;
+    } else {
+      // Default to newest if no order is specified
+      whereQuery.order = [["updated_at", "DESC"]];
     }
     whereQuery.include = [
       {
@@ -268,19 +272,40 @@ class UserRepository {
     }
     
     try {
-      await user.update({
-        email: userData.email ?? user.email,
-        password: userData.password ?? user.password,
-        name: userData.name ?? user.name,
-        role_id: userData.roleId ?? user.role_id,
-        gender: userData.gender ?? user.gender,
-        phone: userData.phone ?? user.phone,
-        status: userData.status ?? user.status,
-        updated_by: userData.updatedBy ?? user.updated_by,
+      // Build update object with only provided fields
+      const updateFields = {
         updated_at: new Date(),
-      });
+      };
       
-      ctx.log?.debug({ userId }, "repo_update_user_success");
+      // Only include fields that are explicitly provided in userData
+      if (userData.email !== undefined) {
+        updateFields.email = userData.email;
+      }
+      if (userData.password !== undefined) {
+        updateFields.password = userData.password;
+      }
+      if (userData.name !== undefined) {
+        updateFields.name = userData.name;
+      }
+      if (userData.roleId !== undefined) {
+        updateFields.role_id = userData.roleId;
+      }
+      if (userData.gender !== undefined) {
+        updateFields.gender = userData.gender;
+      }
+      if (userData.phone !== undefined) {
+        updateFields.phone = userData.phone;
+      }
+      if (userData.status !== undefined) {
+        updateFields.status = userData.status;
+      }
+      if (userData.updatedBy !== undefined) {
+        updateFields.updated_by = userData.updatedBy;
+      }
+      
+      await user.update(updateFields);
+      
+      ctx.log?.debug({ userId, updateFields }, "repo_update_user_success");
       return user.toJSON();
     } catch (error) {
       ctx.log?.error({ error: error.message, userId }, "repo_update_user_error");
