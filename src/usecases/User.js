@@ -31,20 +31,36 @@ class UserUsecase {
   async listUsers(filters, ctx) {
     ctx.log?.info({}, "usecase_list_users");
     const data = await this.userRepository.listAll(filters, ctx);
-    return {
-      users: data.users.map((user) => {
-        const { password, ...userWithoutPassword } = user;
-        userWithoutPassword.gender =
-          UserGenderIntToStr[userWithoutPassword.gender];
-        userWithoutPassword.status =
-          UserStatusIntToStr[userWithoutPassword.status];
-        userWithoutPassword.created_by = userWithoutPassword.createdBy;
-        userWithoutPassword.updated_by = userWithoutPassword.updatedBy;
+    
+    let users = data.users.map((user) => {
+      const { password, ...userWithoutPassword } = user;
+      userWithoutPassword.gender =
+        UserGenderIntToStr[userWithoutPassword.gender];
+      userWithoutPassword.status =
+        UserStatusIntToStr[userWithoutPassword.status];
+      userWithoutPassword.created_by = userWithoutPassword.createdBy;
+      userWithoutPassword.updated_by = userWithoutPassword.updatedBy;
 
-        delete userWithoutPassword.createdBy;
-        delete userWithoutPassword.updatedBy;
-        return userWithoutPassword;
-      }),
+      delete userWithoutPassword.createdBy;
+      delete userWithoutPassword.updatedBy;
+      return userWithoutPassword;
+    });
+    
+    // Handle case-insensitive sorting for a-z and z-a if needed
+    if (filters.order === 'a-z' || filters.order === 'z-a') {
+      users.sort((a, b) => {
+        const nameA = (a.name || '').toLowerCase();
+        const nameB = (b.name || '').toLowerCase();
+        if (filters.order === 'a-z') {
+          return nameA.localeCompare(nameB);
+        } else {
+          return nameB.localeCompare(nameA);
+        }
+      });
+    }
+    
+    return {
+      users,
       total: data.total,
     };
   }

@@ -162,30 +162,6 @@ class UserRepository {
       whereQuery.offset = parseInt(filters.offset);
     }
 
-    let order;
-    if (filters.order) {
-      switch (filters.order) {
-        case "oldest":
-          order = [["updated_at", "ASC"]];
-          break;
-        case "newest":
-          order = [["updated_at", "DESC"]];
-          break;
-        case "a-z":
-          order = [[sequelize.fn('LOWER', sequelize.col('users.name')), "ASC"]];
-          break;
-        case "z-a":
-          order = [[sequelize.fn('LOWER', sequelize.col('users.name')), "DESC"]];
-          break;
-        default:
-          break;
-      }
-
-      whereQuery.order = order;
-    } else {
-      // Default to newest if no order is specified
-      whereQuery.order = [["updated_at", "DESC"]];
-    }
     whereQuery.include = [
       {
         model: this.roleModel,
@@ -203,6 +179,37 @@ class UserRepository {
         attributes: ["id", "name", "email"],
       },
     ];
+    
+    // Set order after includes to ensure proper column resolution
+    let order;
+    if (filters.order) {
+      switch (filters.order) {
+        case "oldest":
+          order = [["updated_at", "ASC"]];
+          break;
+        case "newest":
+          order = [["updated_at", "DESC"]];
+          break;
+        case "a-z":
+          // Use simple column name - Sequelize resolves it to the main model when no ambiguity
+          // For case-insensitive, we'll sort in JavaScript after fetching, or use a subquery approach
+          // For now, use simple sort and handle case-insensitive in the usecase
+          order = [['name', 'ASC']];
+          break;
+        case "z-a":
+          // Use simple column name - Sequelize resolves it to the main model when no ambiguity
+          order = [['name', 'DESC']];
+          break;
+        default:
+          break;
+      }
+
+      whereQuery.order = order;
+    } else {
+      // Default to newest if no order is specified
+      whereQuery.order = [["updated_at", "DESC"]];
+    }
+    
     try {
       const users = await this.userModel.findAndCountAll(whereQuery);
       return {
