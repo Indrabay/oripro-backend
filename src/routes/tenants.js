@@ -77,7 +77,14 @@ function InitTenantRouter(TenantUseCase, TenantPaymentLogUsecase) {
     }
   });
 
-  router.get('/', async (req, res) => {
+  router.get('/', [
+    query('payment_status').optional().isIn(['paid', 'scheduled', 'reminder_needed', 'overdue']).withMessage('payment_status must be one of: paid, scheduled, reminder_needed, overdue'),
+  ], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json(createResponse(null, "bad request", 400, false, {}, errors));
+    }
+
     let limit = req.query.limit ? parseInt(req.query.limit) : 10
     let offset = req.query.offset ? parseInt(req.query.offset) : 0
 

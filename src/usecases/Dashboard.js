@@ -225,7 +225,7 @@ class DashboardUsecase {
         })
       );
 
-      // Get workers (users with role cleaning or security)
+      // Get workers (users with role Kebersihan or Keamanan)
       const allUsers = await this.userRepository.listAll({}, ctx);
       const workers = (allUsers.users || []).filter(
         (user) =>
@@ -233,8 +233,8 @@ class DashboardUsecase {
           user.role &&
           user.role.name &&
           typeof user.role.name === 'string' &&
-          (user.role.name.toLowerCase() === 'cleaning' ||
-            user.role.name.toLowerCase() === 'security')
+          (user.role.name.toLowerCase() === 'kebersihan' ||
+            user.role.name.toLowerCase() === 'keamanan')
       );
 
       // Get worker stats (attendance and task completion)
@@ -289,7 +289,80 @@ class DashboardUsecase {
         })
       );
 
-      // Get daily task completion for last 7 days
+      // Helper function to calculate task completion by role for a date range
+      const calculateTaskCompletionByRole = (tasks, startDate, endDate) => {
+        const filteredTasks = tasks.filter((ut) => {
+          if (!ut.created_at) return false;
+          const taskDate = new Date(ut.created_at);
+          return taskDate >= startDate && taskDate < endDate;
+        });
+
+        // Categorize tasks by role (Keamanan and Kebersihan)
+        const keamananTasks = filteredTasks.filter((ut) => {
+          const roleName = ut.task?.role?.name || ut.user?.role?.name || '';
+          return roleName.toLowerCase() === 'keamanan';
+        });
+
+        const kebersihanTasks = filteredTasks.filter((ut) => {
+          const roleName = ut.task?.role?.name || ut.user?.role?.name || '';
+          return roleName.toLowerCase() === 'kebersihan';
+        });
+
+        // Calculate completion for Keamanan
+        const keamananTotal = keamananTasks.length;
+        const keamananCompleted = keamananTasks.filter((ut) => {
+          const status = ut.status || (ut.completed_at ? 'completed' : 'pending');
+          return status === 'completed' || ut.completed_at !== null;
+        }).length;
+        const keamananCompletion = keamananTotal > 0
+          ? Math.round((keamananCompleted / keamananTotal) * 100)
+          : 0;
+
+        // Calculate completion for Kebersihan
+        const kebersihanTotal = kebersihanTasks.length;
+        const kebersihanCompleted = kebersihanTasks.filter((ut) => {
+          const status = ut.status || (ut.completed_at ? 'completed' : 'pending');
+          return status === 'completed' || ut.completed_at !== null;
+        }).length;
+        const kebersihanCompletion = kebersihanTotal > 0
+          ? Math.round((kebersihanCompleted / kebersihanTotal) * 100)
+          : 0;
+
+        return {
+          keamanan: {
+            completion: keamananCompletion,
+            total: keamananTotal,
+            completed: keamananCompleted,
+          },
+          kebersihan: {
+            completion: kebersihanCompletion,
+            total: kebersihanTotal,
+            completed: kebersihanCompleted,
+          },
+        };
+      };
+
+      // Get all user tasks once (for last 3 months to cover weekly and monthly calculations)
+      const threeMonthsAgo = new Date();
+      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+      threeMonthsAgo.setHours(0, 0, 0, 0);
+
+      const allUserTasksResult = await this.userTaskRepository.findAll(
+        {
+          limit: 50000,
+          offset: 0,
+        },
+        ctx
+      );
+
+      // Filter tasks to only include those from the last 3 months
+      const allTasks = (allUserTasksResult.rows || []).filter((ut) => {
+        if (!ut.created_at) return false;
+        const taskDate = new Date(ut.created_at);
+        return taskDate >= threeMonthsAgo;
+      });
+
+      // Get daily task completion for last 7 days, categorized by role (Keamanan and Kebersihan)
       const dailyTaskCompletion = [];
       for (let i = 6; i >= 0; i--) {
         const date = new Date();
@@ -298,40 +371,36 @@ class DashboardUsecase {
         const nextDate = new Date(date);
         nextDate.setDate(nextDate.getDate() + 1);
 
-        // Get all user tasks for this day
-        const allUserTasksResult = await this.userTaskRepository.findAll(
-          {
-            limit: 10000,
-            offset: 0,
-          },
-          ctx
-        );
-
-        const dayTasks = (allUserTasksResult.rows || []).filter((ut) => {
-          if (!ut.created_at) return false;
-          const taskDate = new Date(ut.created_at);
-          return taskDate >= date && taskDate < nextDate;
-        });
-
-        const totalDayTasks = dayTasks.length;
-        const completedDayTasks = dayTasks.filter(
-          (ut) => {
-            const status = ut.status || (ut.completed_at ? 'completed' : 'pending');
-            return status === 'completed' || ut.completed_at !== null;
-          }
-        ).length;
-        const completionPercentage =
-          totalDayTasks > 0
-            ? Math.round((completedDayTasks / totalDayTasks) * 100)
-            : 0;
-
+        const completion = calculateTaskCompletionByRole(allTasks, date, nextDate);
         const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
         dailyTaskCompletion.push({
           day: dayNames[date.getDay()],
           date: date.toISOString().split('T')[0],
-          completion: completionPercentage,
-          total: totalDayTasks,
-          completed: completedDayTasks,
+          ...completion,
+        });
+      }
+
+      // Get monthly task completion for last 12 months, categorized by role
+      const monthlyTaskCompletion = [];
+      for (let i = 11; i >= 0; i--) {
+        const monthStart = new Date();
+        monthStart.setMonth(monthStart.getMonth() - i);
+        monthStart.setDate(1);
+        monthStart.setHours(0, 0, 0, 0);
+        
+        const monthEnd = new Date(monthStart);
+        monthEnd.setMonth(monthEnd.getMonth() + 1);
+
+        const completion = calculateTaskCompletionByRole(allTasks, monthStart, monthEnd);
+        
+        // Format month label (e.g., "Januari 2024")
+        const monthLabel = monthStart.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+        
+        monthlyTaskCompletion.push({
+          month: monthLabel,
+          monthStart: monthStart.toISOString().split('T')[0],
+          monthEnd: new Date(monthEnd.getTime() - 1).toISOString().split('T')[0],
+          ...completion,
         });
       }
 
@@ -430,6 +499,7 @@ class DashboardUsecase {
         }),
         workers: workersWithStats,
         dailyTaskCompletion: dailyTaskCompletion,
+        monthlyTaskCompletion: monthlyTaskCompletion,
       };
     } catch (error) {
       ctx.log?.error(

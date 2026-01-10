@@ -127,13 +127,29 @@ class UserTaskRepository {
           {
             model: this.userModel,
             as: 'user',
-            attributes: ['id', 'name', 'email']
+            attributes: ['id', 'name', 'email'],
+            include: [
+              {
+                model: require('../models/Role'),
+                as: 'role',
+                attributes: ['id', 'name', 'level'],
+                required: false
+              }
+            ]
           },
           {
             model: this.taskModel,
             as: 'task',
             attributes: ['id', 'name', 'duration', 'is_scan', 'scan_code'],
-            required: false
+            required: false,
+            include: [
+              {
+                model: require('../models/Role'),
+                as: 'role',
+                attributes: ['id', 'name', 'level'],
+                required: false
+              }
+            ]
           },
           {
             model: this.userTaskEvidenceModel,
@@ -511,8 +527,11 @@ class UserTaskRepository {
           },
         });
 
-        // Filter task groups where current time is within 1 hour before OR after start_time
-        // (0-60 minutes before or after start_time)
+        // Get time window from environment variable (default: 180 minutes = 3 hours)
+        const timeWindowMinutes = parseInt(process.env.TASK_GENERATION_TIME_WINDOW_MINUTES || '180', 10);
+        
+        // Filter task groups where current time is within the configured time window before OR after start_time
+        // (default: 0-180 minutes before or after start_time)
         const matchingTaskGroups = allTaskGroups.filter(tg => {
           const tgJson = tg.toJSON();
           const [startH, startM] = tgJson.start_time.split(':').map(Number);
@@ -544,10 +563,10 @@ class UserTaskRepository {
             timeDiffAfterMinutes = (24 * 60) - startMinutes + currentMinutes;
           }
 
-          // Check if current time is within 1 hour (0-60 minutes) before OR after start_time
-          // This gives a 1-hour window for task generation both before and after shift start
-          const isWithinBeforeWindow = timeDiffBeforeMinutes >= 0 && timeDiffBeforeMinutes <= 60;
-          const isWithinAfterWindow = timeDiffAfterMinutes >= 0 && timeDiffAfterMinutes <= 60;
+          // Check if current time is within the configured time window before OR after start_time
+          // This gives a configurable window for task generation both before and after shift start
+          const isWithinBeforeWindow = timeDiffBeforeMinutes >= 0 && timeDiffBeforeMinutes <= timeWindowMinutes;
+          const isWithinAfterWindow = timeDiffAfterMinutes >= 0 && timeDiffAfterMinutes <= timeWindowMinutes;
           
           return isWithinBeforeWindow || isWithinAfterWindow;
         });

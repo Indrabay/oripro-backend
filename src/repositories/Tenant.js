@@ -62,7 +62,7 @@ class TenantRepository {
   async findAll(filter = {}, ctx) {
     try {
       let whereQuery = {};
-      if (filter.name || filter.user_id || filter.status || filter.category_id || filter.category) {
+      if (filter.name || filter.user_id || filter.status || filter.category_id || filter.category || filter.payment_status) {
         whereQuery.where = {};
         if (filter.name && filter.name.trim()) {
           whereQuery.where.name = {
@@ -76,6 +76,10 @@ class TenantRepository {
 
         if (filter.status) {
           whereQuery.where.status = filter.status;
+        }
+
+        if (filter.payment_status) {
+          whereQuery.where.payment_status = filter.payment_status;
         }
 
         // Support both 'category' and 'category_id' filter parameters
