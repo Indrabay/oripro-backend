@@ -189,11 +189,31 @@ class UserTaskRepository {
   async findByUserId(userId, queryParams = {}, ctx = {}) {
     try {
       ctx.log?.info({ userId, queryParams }, 'UserTaskRepository.findByUserId');
-      const { limit = 10, offset = 0 } = queryParams;
+      const { limit = 10, offset = 0, date_from = null, date_to = null } = queryParams;
+      const { Op } = require('sequelize');
+      
+      // Build date filter if provided
+      let dateFilter = {};
+      if (date_from || date_to) {
+        dateFilter.created_at = {};
+        if (date_from) {
+          // Start of the day for date_from
+          const fromDate = new Date(date_from);
+          fromDate.setHours(0, 0, 0, 0);
+          dateFilter.created_at[Op.gte] = fromDate;
+        }
+        if (date_to) {
+          // End of the day for date_to
+          const toDate = new Date(date_to);
+          toDate.setHours(23, 59, 59, 999);
+          dateFilter.created_at[Op.lte] = toDate;
+        }
+      }
       
       // Step 1: Get all user tasks from this user, ordered by created_at DESC to find the latest code
+      const codeWhereClause = { user_id: userId, ...dateFilter };
       const allUserTasksForCode = await this.userTaskModel.findAll({
-        where: { user_id: userId },
+        where: codeWhereClause,
         order: [['created_at', 'DESC']],
         limit: 1, // Just need the first one to get the code
         attributes: ['code', 'created_at']
@@ -209,13 +229,15 @@ class UserTaskRepository {
       ctx.log?.info({ 
         userId, 
         latestCode,
-        hasCode: !!latestCode
+        hasCode: !!latestCode,
+        date_from,
+        date_to
       }, 'UserTaskRepository.findByUserId - Found latest code');
 
-      // Step 3: Get all user tasks filtered by the latest code (if found)
+      // Step 3: Get all user tasks filtered by the latest code (if found) and date range
       const whereClause = latestCode 
-        ? { user_id: userId, code: latestCode }
-        : { user_id: userId };
+        ? { user_id: userId, code: latestCode, ...dateFilter }
+        : { user_id: userId, ...dateFilter };
 
       const { rows, count } = await this.userTaskModel.findAndCountAll({
         where: whereClause,
@@ -508,6 +530,20 @@ class UserTaskRepository {
       
       const sequelize = require('../models/sequelize');
       const result = await sequelize.transaction(async (t) => {
+        // Get user role_id first
+        const user = await this.userModel.findByPk(userId, {
+          attributes: ['id', 'role_id'],
+          transaction: t
+        });
+        
+        if (!user) {
+          ctx.log?.error({ userId }, 'User not found');
+          throw new Error('User not found');
+        }
+        
+        const userRoleId = user.role_id;
+        ctx.log?.info({ userId, userRoleId }, 'User role_id retrieved');
+        
         // Get current day and time in Asia/Jakarta timezone
         const now = moment().tz('Asia/Jakarta');
         const currentDay = now.day(); // 0 = Sunday, 1 = Monday, etc.
@@ -517,7 +553,8 @@ class UserTaskRepository {
         ctx.log?.info({ 
           currentDay,
           currentDayNumber,
-          currentTime
+          currentTime,
+          userRoleId
         }, 'Current day and time for schedule matching');
         
         // Find task groups that match the current time
@@ -525,6 +562,7 @@ class UserTaskRepository {
           where: {
             is_active: true,
           },
+          transaction: t
         });
 
         // Get time window from environment variable (default: 180 minutes = 3 hours)
@@ -591,12 +629,14 @@ class UserTaskRepository {
         };
 
         // Check if user tasks have already been generated for this user in the current task group time range
-        // Get tasks that belong to matching task groups to check for existing user tasks
+        // Get tasks that belong to matching task groups AND match user's role to check for existing user tasks
         const tasksToCheck = await this.taskModel.findAll({
           where: {
-            task_group_id: { [Op.in]: matchingTaskGroupIds }
+            task_group_id: { [Op.in]: matchingTaskGroupIds },
+            role_id: userRoleId // Filter by user's role_id
           },
-          attributes: ['id']
+          attributes: ['id'],
+          transaction: t
         });
         
         const taskIdsToCheck = tasksToCheck.map(t => t.id);
@@ -653,12 +693,19 @@ class UserTaskRepository {
           }
         }
         
-        // Build where clause for tasks - only get tasks that belong to matching task groups
+        // Build where clause for tasks - only get tasks that belong to matching task groups AND match user's role
         const taskWhereClause = {
-          task_group_id: { [Op.in]: matchingTaskGroupIds }
+          task_group_id: { [Op.in]: matchingTaskGroupIds },
+          role_id: userRoleId // Filter by user's role_id
         };
         
-        // First, get all main tasks that belong to matching task groups (regardless of schedules)
+        ctx.log?.info({ 
+          matchingTaskGroupIds,
+          userRoleId,
+          taskWhereClause
+        }, 'Task where clause with role filter');
+        
+        // First, get all main tasks that belong to matching task groups AND match user's role (regardless of schedules)
         // This ensures main tasks are included even if they don't have schedules
         // Get schedules that match current day OR are 'all' - we need ALL matching schedules, not just one
         const allMainTasks = await this.taskModel.findAll({
@@ -760,10 +807,11 @@ class UserTaskRepository {
             // Get child tasks - include those with matching schedules OR those without schedules
             // (child tasks should be created when their parents are created)
             // NOTE: Child tasks should be created if their parent is being created,
-            // regardless of whether the child belongs to a matching task group
+            // but still filter by role_id to ensure they match user's role
             childTasks = await this.taskModel.findAll({
               where: {
-                id: { [Op.in]: childTaskIds }
+                id: { [Op.in]: childTaskIds },
+                role_id: userRoleId // Filter child tasks by user's role_id as well
                 // Remove task_group_id filter - child tasks should be included if their parent is included
               },
               include: [

@@ -131,6 +131,7 @@ function InitAttendanceRouter(attendanceUsecase) {
   router.get('/history', [
     query('date_from').optional().isISO8601().withMessage('date_from must be a valid ISO 8601 date'),
     query('date_to').optional().isISO8601().withMessage('date_to must be a valid ISO 8601 date'),
+    query('user_id').optional().isUUID().withMessage('user_id must be a valid UUID'),
     query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('limit must be between 1 and 100'),
   ], async (req, res) => {
     try {
@@ -143,7 +144,9 @@ function InitAttendanceRouter(attendanceUsecase) {
         });
       }
 
-      const user_id = req.auth?.userId;
+      // Use user_id from query parameter if provided (for admin viewing other users)
+      // Otherwise use authenticated user's ID
+      let user_id = req.query.user_id || req.auth?.userId;
 
       if (!user_id) {
         return res.status(401).json({
@@ -156,7 +159,7 @@ function InitAttendanceRouter(attendanceUsecase) {
       const date_from = req.query.date_from || null;
       const date_to = req.query.date_to || null;
 
-      req.log?.info({ user_id, limit, date_from, date_to }, 'route_get_user_history');
+      req.log?.info({ user_id, limit, date_from, date_to, query_user_id: req.query.user_id }, 'route_get_user_history');
       const result = await attendanceUsecase.getUserAttendanceHistory(user_id, limit, date_from, date_to);
       
       if (result.success) {

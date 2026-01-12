@@ -50,8 +50,20 @@ function InitUserTaskRouter(userTaskUsecase) {
           .json(createResponse(null, "validation error", 400, errors.array()));
       }
       
-      const result = await userTaskUsecase.getUserTasks(req.auth?.userId, req.query, {
-        userId: req.auth?.userId,
+      // Use user_id from query parameter if provided (for admin viewing other users)
+      // Otherwise use authenticated user's ID
+      const userId = req.query.user_id || req.auth?.userId;
+      
+      if (!userId) {
+        return res.status(401).json(
+          createResponse(null, "Unauthorized: User ID not found", 401)
+        );
+      }
+      
+      req.log?.info({ userId, query_user_id: req.query.user_id }, "UserTaskRouter.getUserTasks");
+      
+      const result = await userTaskUsecase.getUserTasks(userId, req.query, {
+        userId: req.auth?.userId, // Keep original authenticated user for context
         log: req.log,
       });
       
@@ -195,6 +207,9 @@ function InitUserTaskRouter(userTaskUsecase) {
   const getUserTasksParam = [
     query("limit").isInt().optional(),
     query("offset").isInt().optional(),
+    query("user_id").optional().isUUID().withMessage("user_id must be a valid UUID"),
+    query("date_from").optional().isISO8601().withMessage("date_from must be a valid ISO 8601 date"),
+    query("date_to").optional().isISO8601().withMessage("date_to must be a valid ISO 8601 date"),
   ];
 
   const startUserTaskParam = [
